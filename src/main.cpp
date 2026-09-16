@@ -1,22 +1,63 @@
-// Build-vaz: csak a toolchain + kijelzo-konfig forditasat igazolja. Vason meg NEM futott.
+// LILYGO T-Dongle-S3 — Claude Usage Monitor
+// Fo ciklus millis()-alapu, nem blokkol; a Claude-lekeres kulon FreeRTOS taskban fut (refresh_scheduler).
 #include <Arduino.h>
-#include <TFT_eSPI.h>
 
-static const char *FW_VERSION = "0.0.1-skeleton";
-static const int PIN_LCD_BL = 38;  // LilyGO factory_screen.ino:46 — aktiv ALACSONY (ledcWrite 0 = max, lcd.ino:96)
+#include "config.h"
+#include "config_manager.h"
+#include "display_manager.h"
+#include "refresh_scheduler.h"
+#include "time_manager.h"
+#include "usage_cache.h"
+#include "web_setup.h"
+#include "wifi_manager.h"
 
-TFT_eSPI tft;
+// Forced setup (spec 10.). ⚠ A LilyGO doksi szerint a BOOT gombot a TAP BEDUGASAKOR nyomva tartva
+// az ESP32-S3 letoltesi modba lep, es a firmware el sem indul (docs/en/t-dongle-s3/REAMDE.MD,
+// "Do not press the BOOT button while powering on"). Ezert a gombot INDULAS UTAN, a kijelzon
+// jelzett BOOT_WINDOW_MS ablakban kell megnyomni; futas kozben BOOT_LONGPRESS_MS hosszu nyomas is jo.
+static bool bootWindow() {
+  uint32_t start = millis();
+  while (millis() - start < BOOT_WINDOW_MS) {
+    displayManager.showBoot(BOOT_WINDOW_MS - (millis() - start));
+    if (digitalRead(PIN_BOOT_BTN) == LOW) return true;
+    delay(50);  // indulaskor, meg semmi mas nem fut
+  }
+  return false;
+}
 
 void setup() {
   Serial.begin(115200);
-  pinMode(PIN_LCD_BL, OUTPUT);
-  digitalWrite(PIN_LCD_BL, LOW);
-  tft.init();
-  tft.setRotation(1);  // 160x80 fekvo — LilyGO examples/TFT_eSPI/TFT_eSPI.ino:35
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  tft.drawString("Claude Monitor", 4, 4, 2);
-  tft.drawString(FW_VERSION, 4, 30, 2);
+  Serial.printf("\n[main] %s, firmware %s\n", BOARD_NAME, FW_VERSION);
+  pinMode(PIN_BOOT_BTN, INPUT_PULLUP);
+
+  configManager.begin();
+  usageCache.begin();
+  timeManager.begin();
+  displayManager.begin();
+
+  bool forced = bootWindow();
+  if (forced) Serial.println("[main] BOOT gomb -> forced setup");
+
+  wifiManager.begin(forced);
+  webSetup.begin();
+  refreshScheduler.begin();
 }
 
-void loop() { delay(10); }
+void loop() {
+  static uint32_t btnDownMs = 0;
+  if (digitalRead(PIN_BOOT_BTN) == LOW) {
+    if (btnDownMs == 0) btnDownMs = millis();
+    if (millis() - btnDownMs > BOOT_LONGPRESS_MS && wifiManager.state() != WifiState::ApForced) {
+      Serial.println("[main] BOOT hosszu nyomas -> forced setup");
+      wifiManager.enterForcedSetup();
+    }
+  } else {
+    btnDownMs = 0;
+  }
+
+  wifiManager.loop();
+  timeManager.loop(wifiManager.staConnected());
+  webSetup.loop();
+  displayManager.loop();
+  delay(2);  // a tobbi tasknak (IDLE watchdog)
+}
