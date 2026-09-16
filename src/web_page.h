@@ -20,6 +20,14 @@ label{display:block;margin-top:6px;font-size:.85em;color:#aaa}
 <h1>Claude Usage Monitor</h1>
 <div class="msg" id="msg"></div>
 
+<div id="loginBox" style="display:none">
+<h2>Login</h2>
+<form onsubmit="return doLogin(event)">
+  <label>Admin password</label><input type="password" name="password" autocomplete="current-password" required>
+  <button type="submit">Login</button>
+</form>
+</div>
+
 <h2>Device</h2>
 <table id="dev"></table>
 <button onclick="post('/api/restart',{}).then(()=>say('Restarting...'))">Restart</button>
@@ -58,13 +66,32 @@ label{display:block;margin-top:6px;font-size:.85em;color:#aaa}
   <button type="submit">Save</button>
 </form>
 
+<h2>Admin password</h2>
+<form onsubmit="return saveAdmin(event)">
+  <div class="muted" id="adminInfo"></div>
+  <label>New admin password (8-64 chars, empty = remove protection)</label><input type="password" name="newPassword" maxlength="64" autocomplete="new-password">
+  <button type="submit">Save</button> <button type="button" onclick="logout()">Logout</button>
+  <div class="muted">Forgot it? Start setup mode with the BOOT button: in that mode no admin password is needed.
+  Note: the device serves plain HTTP, the password travels unencrypted on the local network.</div>
+</form>
+
 <script>
 const $=id=>document.getElementById(id);
 function say(t){$('msg').textContent=t}
+let token='';try{token=sessionStorage.getItem('cmonToken')||''}catch(e){}
+function setToken(t){token=t;try{t?sessionStorage.setItem('cmonToken',t):sessionStorage.removeItem('cmonToken')}catch(e){}}
 function post(url,data){
   const body=new URLSearchParams();for(const k in data)body.append(k,data[k]);
-  return fetch(url,{method:'POST',headers:{'X-CMon':'1'},body}).then(r=>r.json()).then(j=>{if(!j.ok)throw new Error(j.error||'error');return j});
+  const h={'X-CMon':'1'};if(token)h['X-CMon-Token']=token;
+  return fetch(url,{method:'POST',headers:h,body}).then(r=>r.json().then(j=>{
+    if(r.status===401&&url!=='/api/login'){setToken('');$('loginBox').style.display='block'}
+    if(!j.ok)throw new Error(j.error||'error');return j}));
 }
+function doLogin(ev){ev.preventDefault();const f=ev.target;
+  post('/api/login',{password:f.password.value}).then(j=>{setToken(j.token);f.reset();$('loginBox').style.display='none';say('Logged in')}).catch(e=>say(e.message));return false}
+function logout(){setToken('');say('Logged out');loadStatus()}
+function saveAdmin(ev){ev.preventDefault();const f=ev.target;
+  post('/api/admin',{newPassword:f.newPassword.value}).then(()=>{f.reset();setToken('');say('Admin password saved - log in again if set');loadStatus()}).catch(e=>say(e.message));return false}
 function formData(f){const d={};for(const el of f.elements){if(!el.name)continue;if(el.type==='checkbox'){if(el.checked)d[el.name]='1'}else d[el.name]=el.value}return d}
 function cell(tr,txt){const td=document.createElement('td');td.textContent=txt;tr.appendChild(td);return td}
 function btn(td,label,fn,cls){const b=document.createElement('button');b.type='button';b.textContent=label;if(cls)b.className=cls;b.onclick=fn;td.appendChild(b)}
@@ -77,6 +104,8 @@ function loadStatus(){fetch('/api/status').then(r=>r.json()).then(s=>{
     ['IP',s.wifi.ip],['RSSI',s.wifi.rssi?s.wifi.rssi+' dBm':''],['Time synced',s.timeSynced?'yes':'no'],
     ['Last Claude update',last],['Claude requests since boot',s.claudeFetchCount],['Free heap',s.freeHeap+' B'],['Uptime',s.uptimeS+' s']];
   for(const [k,v] of rows){const tr=document.createElement('tr');cell(tr,k);cell(tr,String(v));t.appendChild(tr)}
+  $('adminInfo').textContent=s.adminSet?(s.adminRequired?'Admin password is set.':'Admin password is set, but not required in setup mode.'):'No admin password: anyone on this network can change the settings.';
+  $('loginBox').style.display=(s.adminRequired&&!token)?'block':'none';
   if(cfg)renderClaude(s.claude);
 }).catch(()=>{})}
 

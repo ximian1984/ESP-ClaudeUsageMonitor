@@ -2,6 +2,7 @@
 // Fo ciklus millis()-alapu, nem blokkol; a Claude-lekeres kulon FreeRTOS taskban fut (refresh_scheduler).
 #include <Arduino.h>
 
+#include "admin_auth.h"
 #include "config.h"
 #include "config_manager.h"
 #include "display_manager.h"
@@ -31,6 +32,7 @@ void setup() {
   pinMode(PIN_BOOT_BTN, INPUT_PULLUP);
 
   configManager.begin();
+  adminAuth.begin();
   usageCache.begin();
   timeManager.begin();
   displayManager.begin();

@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <WebServer.h>
 
+#include "admin_auth.h"
 #include "claude_client.h"
 #include "config.h"
 #include "config_manager.h"
@@ -38,9 +39,22 @@ static void sendOk() {
 // CSRF-vedelem: a modosito kereseknek egyedi fejlecet kell kuldeniuk. Idegen weboldal ilyet csak
 // CORS-preflighttal kuldhetne, amire ez a szerver nem valaszol — igy egy rosszindulatu oldal
 // a bongeszobol nem irhatja at a konfigot.
-static bool guardPost() {
+static bool csrfOk() {
   if (server.header("X-CMon") != "1") {
     sendError(403, "missing X-CMon header");
+    return false;
+  }
+  return true;
+}
+
+// Admin-jelszo kell-e most? Forced setup (BOOT gomb, fizikai hozzaferes) = nem: ez a helyreallitasi ut.
+static bool adminRequired() { return adminAuth.passwordSet() && wifiManager.state() != WifiState::ApForced; }
+
+// Minden modosito keres kapuja: CSRF-fejlec + (ha be van allitva) ervenyes admin-token.
+static bool guardPost() {
+  if (!csrfOk()) return false;
+  if (adminRequired() && !adminAuth.tokenValid(server.header("X-CMon-Token"))) {
+    sendError(401, "login required");
     return false;
   }
   return true;
@@ -84,6 +98,8 @@ static void handleStatus() {
   doc["uptimeS"] = millis() / 1000;
   doc["freeHeap"] = ESP.getFreeHeap();
   doc["claudeFetchCount"] = refreshScheduler.fetchCount();
+  doc["adminSet"] = adminAuth.passwordSet();
+  doc["adminRequired"] = adminRequired();
 
   DeviceConfig cfg = configManager.snapshot();
   time_t lastUpdate = 0;
@@ -236,6 +252,32 @@ static void handleScanResults() {
   sendJson(200, doc);
 }
 
+static void handleLogin() {
+  if (!csrfOk()) return;
+  String token;
+  switch (adminAuth.login(server.arg("password"), token)) {  // a jelszo nem kerul logba
+    case AdminAuth::LoginResult::Ok: {
+      JsonDocument doc;
+      doc["ok"] = true;
+      doc["token"] = token;
+      return sendJson(200, doc);
+    }
+    case AdminAuth::LoginResult::LockedOut:
+      return sendError(429, "too many attempts, wait 60 s");
+    case AdminAuth::LoginResult::Wrong:
+      return sendError(401, "wrong password");
+  }
+}
+
+static void handleAdminPassword() {
+  if (!guardPost()) return;
+  String pw = server.arg("newPassword");
+  if (!pw.isEmpty() && (pw.length() < ADMIN_PASS_MIN || pw.length() > ADMIN_PASS_MAX || !printableAscii(pw, true)))
+    return sendError(400, "admin password: 8-64 ASCII chars, or empty to remove");
+  if (!adminAuth.setPassword(pw)) return sendError(500, "save failed");
+  sendOk();  // minden token ervenytelen lett -> a bongeszonek ujra be kell lepnie
+}
+
 static bool restartPending = false;
 static uint32_t restartAtMs = 0;
 
@@ -247,8 +289,8 @@ static void handleRestart() {
 }
 
 void WebSetup::begin() {
-  static const char *headers[] = {"X-CMon"};
-  server.collectHeaders(headers, 1);
+  static const char *headers[] = {"X-CMon", "X-CMon-Token"};
+  server.collectHeaders(headers, 2);
 
   server.on("/", HTTP_GET, [] {
     server.sendHeader("Cache-Control", "no-store");
@@ -264,6 +306,8 @@ void WebSetup::begin() {
   server.on("/api/scan", HTTP_POST, handleScanStart);
   server.on("/api/scan", HTTP_GET, handleScanResults);
   server.on("/api/restart", HTTP_POST, handleRestart);
+  server.on("/api/login", HTTP_POST, handleLogin);
+  server.on("/api/admin", HTTP_POST, handleAdminPassword);
   server.onNotFound([] { server.send(404, "text/plain", "not found"); });
   server.begin();
 }
