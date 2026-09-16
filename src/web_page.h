@@ -47,14 +47,17 @@ label{display:block;margin-top:6px;font-size:.85em;color:#aaa}
 </form>
 
 <h2>Claude profiles</h2>
-<table><thead><tr><th>Name</th><th>Organization ID</th><th>Enabled</th><th>Auth</th><th>Last update</th><th></th></tr></thead><tbody id="claudeList"></tbody></table>
+<table><thead><tr><th>Name</th><th>Source</th><th>Organization ID</th><th>Enabled</th><th>Auth</th><th>Last update</th><th></th></tr></thead><tbody id="claudeList"></tbody></table>
 <form id="claudeForm" onsubmit="return saveClaude(event)">
   <input type="hidden" name="idx" value="-1">
   <b id="claudeFormTitle">Add Claude profile</b>
   <label>Name (max 12)</label><input type="text" name="name" maxlength="12" required>
-  <label>Organization ID (UUID)</label><input type="text" name="orgId" maxlength="36" required>
+  <label>Source</label><select name="transport">
+    <option value="web-session">claude.ai web (sessionKey cookie)</option>
+    <option value="oauth">api.anthropic.com (OAuth token)</option>
+  </select>
+  <label>Organization ID (UUID, needed for claude.ai web)</label><input type="text" name="orgId" maxlength="36">
   <label>Session / authentication value</label><input type="password" name="auth" maxlength="256" autocomplete="off">
-  <label id="claudeKeepLbl" style="display:none"><input type="checkbox" name="changeAuth" value="1"> clear stored auth</label>
   <label><input type="checkbox" name="enabled" value="1" checked> enabled</label>
   <button type="submit">Save</button> <button type="button" onclick="resetClaudeForm()">New</button>
   <div class="muted">The stored value is never shown again. When editing, leave empty to keep it.</div>
@@ -140,17 +143,17 @@ function renderClaude(st){
   const tb=$('claudeList');tb.textContent='';
   for(const c of cfg.claude){const tr=document.createElement('tr');
     const s=(st||[]).find(x=>x.idx===c.idx);
-    cell(tr,c.name);cell(tr,c.orgId);cell(tr,c.enabled?'yes':'no');cell(tr,c.hasAuth?'set':'missing');
+    cell(tr,c.name);cell(tr,c.transport);cell(tr,c.orgId||'-');cell(tr,c.enabled?'yes':'no');cell(tr,c.hasAuth?'set':'missing');
     cell(tr,s?(s.hasData?s.lastOkAgoS+' s ago':'-')+(s.lastError?' / '+s.lastError+(s.httpStatus?' '+s.httpStatus:''):''):'-');
     const td=cell(tr,'');
     btn(td,'Edit',()=>editClaude(c));
-    btn(td,c.enabled?'Disable':'Enable',()=>post('/api/claude',{idx:c.idx,name:c.name,orgId:c.orgId,enabled:c.enabled?'0':'1'}).then(load).catch(e=>say(e.message)));
+    btn(td,c.enabled?'Disable':'Enable',()=>post('/api/claude',{idx:c.idx,name:c.name,transport:c.transport,orgId:c.orgId,enabled:c.enabled?'0':'1'}).then(load).catch(e=>say(e.message)));
     btn(td,'Delete',()=>{if(confirm('Delete '+c.name+'?'))post('/api/claude/delete',{idx:c.idx}).then(load).catch(e=>say(e.message))},'danger');
     tb.appendChild(tr)}
 }
-function editClaude(c){const f=$('claudeForm');f.idx.value=c.idx;f.elements['name'].value=c.name;f.orgId.value=c.orgId;f.auth.value='';f.enabled.checked=c.enabled;
-  f.changeAuth.checked=false;$('claudeKeepLbl').style.display='block';$('claudeFormTitle').textContent='Edit Claude profile';}
-function resetClaudeForm(){const f=$('claudeForm');f.reset();f.idx.value=-1;$('claudeKeepLbl').style.display='none';$('claudeFormTitle').textContent='Add Claude profile'}
+function editClaude(c){const f=$('claudeForm');f.idx.value=c.idx;f.elements['name'].value=c.name;f.transport.value=c.transport;f.orgId.value=c.orgId;f.auth.value='';f.enabled.checked=c.enabled;
+  $('claudeFormTitle').textContent='Edit Claude profile';}
+function resetClaudeForm(){const f=$('claudeForm');f.reset();f.idx.value=-1;$('claudeFormTitle').textContent='Add Claude profile'}
 function saveClaude(ev){ev.preventDefault();const f=ev.target;const d=formData(f);if(!d.enabled)d.enabled='0';if(d.auth)d.changeAuth='1';
   post('/api/claude',d).then(()=>{say('Claude profile saved');resetClaudeForm();load()}).catch(e=>say(e.message));return false}
 

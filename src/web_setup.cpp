@@ -141,6 +141,7 @@ static void handleConfig() {
     JsonObject o = ca.add<JsonObject>();
     o["idx"] = i;
     o["name"] = p.name;
+    o["transport"] = transportName((ClaudeTransport)p.transport);
     o["orgId"] = p.orgId;
     o["enabled"] = p.enabled;
     o["hasAuth"] = p.auth[0] != '\0';  // az auth maga SOHA
@@ -199,17 +200,28 @@ static void handleClaudeSave() {
   name.trim();
   if (name.isEmpty() || name.length() > CLAUDE_NAME_MAX || !printableAscii(name, true))
     return sendError(400, "name: 1-12 ASCII chars");
+  String tr = server.arg("transport");
+  int transport = -1;
+  for (int t = 0; t < CLAUDE_TRANSPORT_COUNT; t++)
+    if (tr == transportName((ClaudeTransport)t)) transport = t;
+  if (transport < 0) return sendError(400, "transport: web-session or oauth");
   String org = server.arg("orgId");
   org.trim();
-  if (!isValidOrgId(org.c_str())) return sendError(400, "Organization ID must be a UUID");
+  if (transportNeedsOrgId((ClaudeTransport)transport) && !isValidOrgId(org.c_str()))
+    return sendError(400, "Organization ID must be a UUID");
+  if (!org.isEmpty() && !isValidOrgId(org.c_str())) return sendError(400, "Organization ID must be a UUID or empty");
 
   ClaudeProfile p = cfg.claude[idx];
+  // Transport-valtaskor a regi titok mas tipusu (suti vs. token) -> uj ertek kell.
+  if (p.used && p.transport != transport && !argBool("changeAuth")) return sendError(400, "transport changed: enter the new auth value");
+  p.transport = (uint8_t)transport;
   if (!p.used || argBool("changeAuth")) {
     String auth = server.arg("auth");
     auth.trim();
     // Fejlec-injektalas ellen: csak lathato ASCII, szokoz/;/, nelkul (sutiertekbe kerul).
     if (auth.length() > CLAUDE_AUTH_MAX || !printableAscii(auth, false) || auth.indexOf(';') >= 0 || auth.indexOf(',') >= 0)
       return sendError(400, "auth: max 256 visible ASCII chars, no ; or ,");
+    if (auth.isEmpty()) return sendError(400, "auth value required");
     strlcpy(p.auth, auth.c_str(), sizeof(p.auth));
   }
   strlcpy(p.name, name.c_str(), sizeof(p.name));

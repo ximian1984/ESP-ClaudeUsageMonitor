@@ -1,25 +1,30 @@
 // JSON-valasz -> UsageData.
 //
-// ⛔ KAPUZOTT: a valos, hitelesitett /usage valasz szerkezete meg NINCS merve (PLAN.md 2.4).
-// A parser ket, KOZOSSEGI forrasbol ismert alakot tolerál (PLAN.md 2.5), de amig a projektgazda
-// devtools-mintaja nem igazolja, melyiket adja ma a claude.ai, alapbol NEM ad ki adatot:
-//   - felismert alak      -> ParserPending ("PARSER TODO" a kijelzon)
-//   - nem felismert alak  -> Parse ("USAGE PARSE")
-// Vason-probahoz a kapu build-flaggel nyithato: -DUSAGE_PARSER_ENABLE=1
+// A valos valasz (2026-09-16, api.anthropic.com/api/oauth/usage, PLAN.md 2.6) ket helyen adja ugyanazt:
+//   1) "limits": [{kind, group, percent, severity, resets_at, scope, is_active}, ...]  -> ELSODLEGES
+//   2) "five_hour" / "seven_day": {utilization, resets_at, ...}                          -> TARTALEK
+// Ismeretlen kulcsok, null codename-mezok nem zavarnak. Hibas JSON-ra nem omlik ossze.
+//
+// Kapu: alapbol NYITVA (az alak valos mintaval igazolt). -DUSAGE_PARSER_ENABLE=0 visszazarja
+// (felismert alak -> ParserPending), pl. ha a Claude API valtozik es gyanus az adat.
 #pragma once
 #include <Arduino.h>
 
 #include "usage_types.h"
 
-enum class UsageShape : uint8_t {
-  None,       // nem felismert
-  TopLevel,   // A: {"five_hour":{"utilization":..,"resets_at":..}, "seven_day":{..}, "seven_day_*":..}
-  RawLimits,  // B: {"raw_limits":{"five_hour":{"remaining_tokens":..,"total_tokens":..,"reset_at":..}, ..}}
+#ifndef USAGE_PARSER_ENABLE
+#define USAGE_PARSER_ENABLE 1
+#endif
+
+enum class UsageSource : uint8_t {
+  None,        // nem felismert
+  LimitsArray, // limits[] adta a session- es/vagy heti limitet
+  TopLevel,    // csak a five_hour / seven_day tartalek
 };
 
-// A kapu NELKULI ertelmezes (host-tesztelheto). Hibas JSON-ra nem omlik ossze.
+// A kapu NELKULI ertelmezes (host-tesztelheto).
 // Visszaad: None, ha legalabb a session- vagy a heti limit megvan; kulonben Parse.
-FetchError parseUsageUngated(const char *body, size_t len, UsageData &out, UsageShape &shape);
+FetchError parseUsageUngated(const char *body, size_t len, UsageData &out, UsageSource &source);
 
 // A firmware ezt hivja: parseUsageUngated + kapu.
 FetchError parseUsage(const String &body, UsageData &out);

@@ -57,6 +57,8 @@ void ConfigManager::load() {
     c.used = p.getBool(key('c', i, "used").c_str(), false);
     if (!c.used) continue;
     c.enabled = p.getBool(key('c', i, "en").c_str(), true);
+    c.transport = p.getUChar(key('c', i, "tr").c_str(), (uint8_t)ClaudeTransport::WebSession);
+    if (c.transport >= CLAUDE_TRANSPORT_COUNT) c.transport = (uint8_t)ClaudeTransport::WebSession;
     p.getString(key('c', i, "name").c_str(), c.name, sizeof(c.name));
     p.getString(key('c', i, "org").c_str(), c.orgId, sizeof(c.orgId));
     p.getString(key('c', i, "auth").c_str(), c.auth, sizeof(c.auth));
@@ -99,11 +101,12 @@ void ConfigManager::writeClaude(int i) {
   if (c.used) {
     p.putBool(key('c', i, "used").c_str(), true);
     p.putBool(key('c', i, "en").c_str(), c.enabled);
+    p.putUChar(key('c', i, "tr").c_str(), c.transport);
     p.putString(key('c', i, "name").c_str(), c.name);
     p.putString(key('c', i, "org").c_str(), c.orgId);
     p.putString(key('c', i, "auth").c_str(), c.auth);
   } else {
-    for (const char *f : {"used", "en", "name", "org", "auth"}) p.remove(key('c', i, f).c_str());
+    for (const char *f : {"used", "en", "tr", "name", "org", "auth"}) p.remove(key('c', i, f).c_str());
   }
   p.end();
 }

@@ -6,9 +6,9 @@ beépített 160×80-as kijelzőn váltogatja több Claude-fiók adatait. Nincs k
 Spec: [`../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md`](../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md) ·
 Mért alapok, döntések: [`PLAN.md`](PLAN.md)
 
-> **Állapot (2026-09-16):** a firmware fordul, de **vason még nem futott**. A usage-válasz feldolgozása
-> (`usage_parser`) **még nincs kész**: a claude.ai valós válaszára vár, addig a kijelző `PARSER TODO`-t
-> mutat. Amit itt `⚠ [vason mérendő]` jelöl, az a forrásból következik, nem mérésből.
+> **Állapot (2026-09-16):** a firmware fordul, de **vason még nem futott**. A usage-feldolgozás a valós
+> válasz-mintához igazítva. **Nyitott döntés:** melyik úton kérje az adatot (claude.ai web vagy OAuth, 11–12.).
+> Amit itt `⚠ [vason mérendő]` jelöl, az a forrásból következik, nem mérésből.
 
 ---
 
@@ -54,7 +54,7 @@ Mérve: `SUCCESS`, RAM 15,3 %, Flash 15,2 %.
 `TypeError: unsupported operand type(s) for +: '_Null' and 'str'`. Ez a PlatformIO 6.2.0 kiírásának
 hibája, nem a kódé: ugyanaz a tiszta build `-v` nélkül `SUCCESS`, és elkészül a `firmware.bin`.
 
-Gépi teszt a hardverfüggetlen részekre (idő-parszolás, formázás, usage-parser kapuval és anélkül).
+Gépi teszt a hardverfüggetlen részekre (idő-parszolás, formázás, usage-parser a valós mintán, kapu nyitva és zárva).
 Az ArduinoJson-t a PlatformIO letöltéséből veszi, ezért előbb egy `pio run` kell:
 
 ```sh
@@ -117,8 +117,8 @@ Szerkesztésnél az üresen hagyott jelszómező megtartja a tároltat. Nyílt h
 
 ## 9. Több Claude profil
 
-Legfeljebb **5** profil: név (max. 12 karakter, a kijelzőn mindig látszik), Organization ID (UUID),
-session/auth érték (jelszómező), engedélyezve.
+Legfeljebb **5** profil: név (max. 12 karakter, a kijelzőn mindig látszik), Source (claude.ai web vagy
+OAuth, lásd 11.), Organization ID (UUID, csak a web úthoz), session/token érték (jelszómező), engedélyezve.
 
 - Minden profil saját cache-t kap. Hiba esetén az utolsó érvényes adat megmarad, és a kijelző mutatja a korát.
 - Profilonként **60 s**-onként frissít, a profilok egyenletesen eltolva (3 profil: 0 / 20 / 40 s).
@@ -149,38 +149,46 @@ A jobb felső sarokban az adat kora (`3m OLD` sárgán, ha régebbi 2 percnél),
 
 ## 11. Claude authentication
 
-⚠ **[feltárandó]** A hitelesítés pontos módja még **nincs igazolva**.
+Claude-profilonként a **Source** mezőben két út közül lehet választani. ⚠ **Hogy melyik legyen a végleges, az még
+nyitott döntés** ([`PLAN.md`](PLAN.md) 2.7).
 
-- Amit mértünk (hamis értékekkel, [`PLAN.md`](PLAN.md) 2.3): a szerver a `sessionKey=sk-ant-sid01-…`
-  sütit külön ágon kezeli.
-- A firmware jelenleg **ideiglenesen** `Cookie: sessionKey=<a beírt érték>` és
-  `anthropic-client-platform: web_claude_ai` fejlécet küld (`src/claude_client.cpp`, `applyAuth()`).
-  Ugyanezt küldi egy közösségi macOS-app is (`linuxlewis/claude-usage`, 2026-02; [`PLAN.md`](PLAN.md) 2.5).
-- A végleges alakot és azt, hogy honnan kell kimásolni az értéket, a projektgazda valós mintája dönti el.
-  Addig ez a szakasz szándékosan nem ad lépéseket.
+| Source | Mit kell megadni | Mért állapot |
+|---|---|---|
+| `claude.ai web (sessionKey cookie)` | Organization ID (UUID) + a `sessionKey` süti értéke | hamis sütivel: a szerver felismeri; **érvényessel 200-as válasz nincs mérve** |
+| `api.anthropic.com (OAuth token)` | OAuth access token (`sk-ant-oat01-…`), org-ID nem kell | **200 + valós válasz mérve** (2026-09-16) |
 
-A tárolt érték soha nem jelenik meg újra: a setup-oldal csak `set` / `missing` jelzést mutat.
-Szerkesztésnél az üresen hagyott mező megtartja a tárolt értéket.
+A firmware által küldött fejlécek (`src/claude_client.cpp`, `kTransports[]`):
+
+- web: `Cookie: sessionKey=<érték>`, `anthropic-client-platform: web_claude_ai`
+  (utóbbi forrása: `linuxlewis/claude-usage` `UsageService.swift:30`);
+- OAuth: `Authorization: Bearer <token>`, `anthropic-beta: oauth-2025-04-20`.
+
+⚠ **[feltárandó]** Az OAuth access token lejárata. A firmware tokent **nem frissít**: ha a token lejár,
+`CLAUDE AUTH` / `ERROR 401` jelenik meg, és új értéket kell beírni.
+⚠ **[feltárandó]** Hogy honnan és hogyan kell az értékeket kimásolni. Ezt a transport-döntés után írjuk le.
+
+A tárolt érték soha nem jelenik meg újra: a setup-oldal csak `set` / `missing` jelzést mutat. Szerkesztésnél az
+üresen hagyott mező megtartja, Source-váltáskor új értéket kér.
 
 ## 12. Endpoint
 
+Nem hivatalos, nem stabil API-k. Mért tények: [`PLAN.md`](PLAN.md) 2.
+
 ```
-GET https://claude.ai/api/organizations/{organization_uuid}/usage
+web:   GET https://claude.ai/api/organizations/{organization_uuid}/usage
+OAuth: GET https://api.anthropic.com/api/oauth/usage
 ```
 
-Nem hivatalos, nem stabil API. Mérve, hitelesítés nélkül ([`PLAN.md`](PLAN.md) 2.):
-
-- **HTTP/1.1**-en (ezt használja az ESP32 `HTTPClient`) az origin JSON-t válaszol. **HTTP/2**-n
-  a Cloudflare kihívást ad (`403`, `cf-mitigated: challenge`).
-- Rossz alakú UUID: `400 invalid_request_error`. Hiányzó vagy rossz session: `403 permission_error`,
-  `error_code: account_session_invalid`.
-- A sikeres (`200`) válasz szerkezete **még nincs mérve**. A parser két közösségi forrásból ismert alakot
-  kezel (legfelső szintű `five_hour`/`seven_day` `utilization`+`resets_at`, illetve `raw_limits` tokenekkel),
-  de **kapuzott**: alapbuildben `PARSER TODO`-t ad. Vason-próbához:
-  `PLATFORMIO_BUILD_FLAGS="-DUSAGE_PARSER_ENABLE=1" pio run -t upload`. Részletek: [`PLAN.md`](PLAN.md) 2.5.
-
-TLS: tanúsítvány-ellenőrzés az ISRG Root X1 és X2 gyökérrel (`src/ca_certs.h`). A lánc 2026-09-16-án:
-Let's Encrypt YE2 → ISRG Root YE → X2 → X1.
+- **claude.ai**: HTTP/1.1-en az origin JSON-t válaszol, HTTP/2-n Cloudflare-kihívás jön. Rossz UUID esetén `400`,
+  rossz session esetén `403 account_session_invalid`.
+- **api.anthropic.com**: hamis tokenre `401 authentication_error`, hitelesítés nélkül `429` + `Retry-After`
+  (a firmware betartja, legfeljebb 1 óráig).
+- **Válasz** (valós minta, OAuth-út: [`test/host/fixtures/`](test/host/fixtures/)):
+  - elsődleges a `limits[]` (`session`, `weekly_all`, `weekly_scoped`; `percent` 0–100, `severity`, `resets_at`);
+  - tartalék a `five_hour` / `seven_day` (`utilization` 0–100, `resets_at`).
+  - A kijelző `severity: "warning"` esetén sárgán mutat.
+- **Parser-kapu**: alapból nyitva. Ha a Claude API változik és gyanús az adat: `PLATFORMIO_BUILD_FLAGS="-DUSAGE_PARSER_ENABLE=0"`.
+- **TLS**: ISRG Root X1 + X2 (claude.ai) és **GTS Root R4** (api.anthropic.com), `src/ca_certs.h`.
 
 ## 13. Hibaelhárítás
 
@@ -192,11 +200,11 @@ Let's Encrypt YE2 → ISRG Root YE → X2 → X1.
 | `NO INTERNET` | DNS/TCP/TLS hiba | hálózat; ha tartós: tanúsítványlánc-váltás (12.) |
 | `TIMEOUT` | 10 s alatt nem jött válasz | automatikusan újrapróbál |
 | `CLOUDFLARE` / `ERROR 403` | Cloudflare-kihívás, nem jutott el a Claude-ig | ⚠ [vason mérendő] a fő kockázat, lásd PLAN 2.1 |
-| `CLAUDE AUTH` / `ERROR 403` vagy `401` | lejárt vagy rossz session | új session-érték a profilba |
-| `RATE LIMIT` / `ERROR 429` | túl sok kérés | automatikus visszalépés |
+| `CLAUDE AUTH` / `ERROR 403` vagy `401` | lejárt vagy rossz session/token (OAuth-nál a lejárat valószínű, lásd 11.) | új érték a profilba |
+| `RATE LIMIT` / `ERROR 429` | túl sok kérés — vagy api.anthropic.com-on hiányzó hitelesítés (mérve) | automatikus visszalépés, `Retry-After` szerint |
 | `CLAUDE HTTP` / `ERROR nnn` | egyéb HTTP-hiba | a soros napló a státuszkódot kiírja |
-| `USAGE PARSE` | a válasz nem JSON, vagy nincs benne sem `five_hour`, sem `seven_day` | a Claude API változhatott → `usage_parser` |
-| `PARSER TODO` | a válasz felismert alakú, de a parser kapuja zárva | valós mintára vár (README 12.) |
+| `USAGE PARSE` | a válasz nem JSON, vagy se `limits[]` session/weekly, se `five_hour`/`seven_day` nincs benne | a Claude API változhatott → `usage_parser` |
+| `PARSER TODO` | a parser kapuja build-flaggel zárva (`USAGE_PARSER_ENABLE=0`) | fordítsd újra a flag nélkül |
 | `NOT SET UP` | hiányzik az Organization ID vagy az auth | setup-oldal |
 
 Elfelejtett admin-jelszó: forced setup (7.), abban a módban nem kell jelszó.
@@ -227,8 +235,9 @@ Elfelejtett admin-jelszó: forced setup (7.), abban a módban nem kell jelszó.
   források ellentmondanak), TLS-kézfogás heap- és stackigénye, Wi-Fi-állapotgép, webszerver.
 - **A Cloudflare dönthet úgy, hogy az ESP32-t nem engedi át** (más TLS-ujjlenyomat, mint a curl-é).
   Ez a projekt fő kockázata.
-- A `usage_parser` és a hitelesítés végleges alakja a valós claude.ai-mintára vár.
-- Nem hivatalos API: a Claude bármikor megváltoztathatja. A javítás helye a `claude_client` és a `usage_parser`.
+- A transport (web vs. OAuth) nyitott. A web úton a `200`-as válasz nincs mérve, az OAuth-token lejárata
+  feltárandó, és a firmware tokent nem frissít.
+- Nem hivatalos API: a Claude bármikor megváltoztathatja. A javítás helye a `claude_client` (`kTransports[]`) és a `usage_parser`.
 - Rejtett (nem sugárzott) SSID nem támogatott.
 - A tanúsítványlánc gyökere változhat (Cloudflare kiadót válthat) → új gyökér a `src/ca_certs.h`-ba.
 - `time_t` 32 bites (Arduino-ESP32 2.0.17) → 2038-ig.

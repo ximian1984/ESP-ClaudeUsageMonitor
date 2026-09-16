@@ -12,13 +12,19 @@ enum class LimitKind : uint8_t {
   Other,    // barmi mas, ha a valasz tobbet ad (bovithetoseg)
 };
 
+// A valos valasz limits[].severity erteke. Mert ertekek (2026-09-16 minta): "normal", "warning".
+// Minden mas string Unknown — nem talalgatjuk, mit jelent.
+enum class Severity : uint8_t { None, Normal, Warning, Unknown };
+
 struct UsageLimit {
   LimitKind kind = LimitKind::Other;
   char label[12] = "";          // kijelzore: "SESSION", "WEEKLY", ...
   bool hasUtilization = false;
-  float utilizationPct = 0;     // 0..100 — a parser normalizal, ha a valasz mas skalat hasznal
+  float utilizationPct = 0;     // 0..100 (mert: utilization/percent 0..100 skala)
   bool hasReset = false;
   time_t resetAt = 0;           // UTC epoch
+  Severity severity = Severity::None;  // csak limits[]-bol
+  bool isActive = false;        // limits[].is_active — jelentese ⚠ [feltarando], csak tarolva
 };
 
 static const int MAX_LIMITS = 6;

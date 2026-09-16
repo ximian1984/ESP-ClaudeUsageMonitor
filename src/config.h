@@ -17,7 +17,7 @@
 #define WIFI_PASS_MAX   64   // WPA2-PSK
 #define CLAUDE_NAME_MAX 12   // a 160 px szeles kijelzore
 #define CLAUDE_ORG_MAX  40   // UUID 36 + tartalek
-#define CLAUDE_AUTH_MAX 256  // ⚠ [feltarando] a valos session-ertek hossza
+#define CLAUDE_AUTH_MAX 256  // ⚠ [feltarando] a valos session-/token-ertek hossza
 
 // --- Kijelzo ---
 #define ROTATION_MIN_S     1
@@ -30,8 +30,16 @@
 #define BOOT_WINDOW_MS           3000    // ennyi ideig figyeli a BOOT gombot inditas utan (ld. main.cpp)
 #define BOOT_LONGPRESS_MS        5000    // futas kozben hosszan nyomva -> setup AP
 
+// --- Claude transport ---
+// ⚠ NYITOTT DONTES (projektgazda): melyik uton kerjuk az adatot. Profilonkent valaszthato, egyik sincs beegetve.
+// A reszletek (host, path, fejlecek) egy helyen: claude_client.cpp kTransports[].
+enum class ClaudeTransport : uint8_t {
+  WebSession = 0,  // claude.ai web + sessionKey suti — 200-as valasz ezen az uton MEG NEM mert
+  OAuth = 1,       // api.anthropic.com + OAuth Bearer — 200-as valasz mert (a koordinator, 2026-09-16)
+};
+#define CLAUDE_TRANSPORT_COUNT 2
+
 // --- Claude refresh (spec 14.) ---
-#define CLAUDE_HOST               "claude.ai"
 #define CLAUDE_REFRESH_PERIOD_S   60
 #define CLAUDE_BACKOFF_MAX_S      900    // atmeneti hibanal legfeljebb 15 perc
 #define CLAUDE_AUTH_BACKOFF_S     600    // 401/403: a szerver x-should-retry: false-t kuld (mert, PLAN.md 2.2)

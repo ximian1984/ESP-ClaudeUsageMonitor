@@ -86,7 +86,9 @@ static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, boo
 
   if (l->hasUtilization) {
     float left = constrain(100.0f - l->utilizationPct, 0.0f, 100.0f);
-    uint16_t c = resetPassed ? TFT_DARKGREY : (left < 10 ? TFT_RED : left < 30 ? TFT_YELLOW : valColor);
+    // A szerver severity-je (mert: "warning" 81 %-os hasznalatnal) is sargara szinez; a kuszobok a tartalek alakra.
+    bool warn = l->severity == Severity::Warning || left < 30;
+    uint16_t c = resetPassed ? TFT_DARKGREY : (left < 10 ? TFT_RED : warn ? TFT_YELLOW : valColor);
     text(String((int)(left + 0.5f)) + "% LEFT", W, y, c, 2, TR_DATUM);
     if (bar) {
       int by = y + 16;

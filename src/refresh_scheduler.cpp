@@ -1,5 +1,7 @@
 #include "refresh_scheduler.h"
 
+#include <algorithm>
+
 #include "claude_client.h"
 #include "config.h"
 #include "config_manager.h"
@@ -40,8 +42,9 @@ static uint32_t backoffMs(FetchError e, uint16_t failures) {
 
 static uint32_t profileIdentity(const ClaudeProfile &c) {
   if (!c.used) return 0;
-  // FNV-1a az org+auth-ra — csak osszehasonlitashoz, sehova nem kerul ki
+  // FNV-1a a transport+org+auth-ra — csak osszehasonlitashoz, sehova nem kerul ki
   uint32_t id = 2166136261UL;
+  id = (id ^ c.transport) * 16777619UL;
   for (const char *s : {c.orgId, "\x1f", c.auth})
     for (const char *p = s; *p; p++) id = (id ^ (uint8_t)*p) * 16777619UL;
   return id;
@@ -98,7 +101,8 @@ void RefreshScheduler::run() {
     ClaudeResponse resp;
     {
       DeviceConfig cfg = configManager.snapshot();
-      resp = fetchUsage(cfg.claude[pick].orgId, cfg.claude[pick].auth);
+      const ClaudeProfile &c = cfg.claude[pick];
+      resp = fetchUsage((ClaudeTransport)c.transport, c.orgId, c.auth);
     }
     _fetchCount++;
 
@@ -118,7 +122,11 @@ void RefreshScheduler::run() {
     } else {
       usageCache.storeError(pick, err, resp.httpStatus);
       uint16_t fails = usageCache.get(pick).consecutiveFailures;
-      nextDue[pick] = done + backoffMs(err, fails);
+      uint32_t wait = backoffMs(err, fails);
+      // 429 + Retry-After: a szerver kerese elsobbseget kap, legfeljebb 1 oraig.
+      if (err == FetchError::RateLimited && resp.retryAfterS > 0)
+        wait = std::max(wait, std::min(resp.retryAfterS, (uint32_t)3600) * (uint32_t)1000);
+      nextDue[pick] = done + wait;
     }
   }
 }

@@ -15,7 +15,8 @@ struct ClaudeProfile {
   bool used = false;
   bool enabled = true;
   char name[CLAUDE_NAME_MAX + 1] = "";
-  char orgId[CLAUDE_ORG_MAX + 1] = "";
+  uint8_t transport = (uint8_t)ClaudeTransport::WebSession;  // regi NVS-bejegyzesnel is ez az alap
+  char orgId[CLAUDE_ORG_MAX + 1] = "";  // csak WebSession-hoz kell
   char auth[CLAUDE_AUTH_MAX + 1] = "";  // TITOK
 };
 
