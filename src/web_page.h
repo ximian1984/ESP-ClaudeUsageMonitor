@@ -52,20 +52,32 @@ label{display:block;margin-top:6px;font-size:.85em;color:#aaa}
   <input type="hidden" name="idx" value="-1">
   <b id="claudeFormTitle">Add Claude profile</b>
   <label>Name (max 12)</label><input type="text" name="name" maxlength="12" required>
-  <label>Source</label><select name="transport">
+  <label>Source</label><select name="transport" onchange="onTransport()">
+    <option value="oauth">api.anthropic.com (OAuth, recommended)</option>
     <option value="web-session">claude.ai web (sessionKey cookie)</option>
-    <option value="oauth">api.anthropic.com (OAuth token)</option>
   </select>
-  <label>Organization ID (UUID, needed for claude.ai web)</label><input type="text" name="orgId" maxlength="36">
-  <label>Session / authentication value</label><input type="password" name="auth" maxlength="256" autocomplete="off">
+  <div id="orgRow"><label>Organization ID (UUID, needed for claude.ai web)</label><input type="text" name="orgId" maxlength="36"></div>
+  <div id="authRow"><label>sessionKey cookie value</label><input type="password" name="auth" maxlength="300" autocomplete="off">
+    <div class="muted">The stored value is never shown again. When editing, leave empty to keep it.</div></div>
   <label><input type="checkbox" name="enabled" value="1" checked> enabled</label>
   <button type="submit">Save</button> <button type="button" onclick="resetClaudeForm()">New</button>
-  <div class="muted">The stored value is never shown again. When editing, leave empty to keep it.</div>
+  <div id="oauthRow" class="muted">OAuth profiles: save first, then use "Login" in the list below to sign in on your phone.</div>
 </form>
 
-<h2>Display</h2>
+<div id="loginFlow" style="display:none;background:#1b1b1b;padding:8px;border-radius:6px;margin-top:8px">
+  <b>OAuth login</b>
+  <div class="muted">1. Open this URL on a device where you are signed in to Claude:</div>
+  <div style="word-break:break-all;margin:6px 0"><a id="authUrl" href="#" target="_blank" rel="noopener"></a></div>
+  <div class="muted">2. After approving, the page shows a code. Paste it here (format <code>code#state</code>):</div>
+  <input type="text" id="oauthCode" placeholder="code#state" autocomplete="off">
+  <button type="button" onclick="finishLogin()">Submit code</button>
+  <button type="button" onclick="$('loginFlow').style.display='none'">Cancel</button>
+</div>
+
+<h2>Display &amp; refresh</h2>
 <form onsubmit="return saveDisplay(event)">
   <label>Profile rotation interval (1-60 sec)</label><input type="number" id="rot" name="rotationSec" min="1" max="60" required>
+  <label>Usage refresh interval per profile (60-3600 sec)</label><input type="number" id="refr" min="60" max="3600" required>
   <button type="submit">Save</button>
 </form>
 
@@ -112,7 +124,7 @@ function loadStatus(){fetch('/api/status').then(r=>r.json()).then(s=>{
   if(cfg)renderClaude(s.claude);
 }).catch(()=>{})}
 
-function load(){fetch('/api/config').then(r=>r.json()).then(c=>{cfg=c;$('rot').value=c.rotationSec;renderWifi();loadStatus()})}
+function load(){fetch('/api/config').then(r=>r.json()).then(c=>{cfg=c;$('rot').value=c.rotationSec;$('refr').value=c.refreshSec;renderWifi();onTransport();loadStatus()})}
 
 function renderWifi(){
   const tb=$('wifiList');tb.textContent='';
@@ -143,21 +155,27 @@ function renderClaude(st){
   const tb=$('claudeList');tb.textContent='';
   for(const c of cfg.claude){const tr=document.createElement('tr');
     const s=(st||[]).find(x=>x.idx===c.idx);
-    cell(tr,c.name);cell(tr,c.transport);cell(tr,c.orgId||'-');cell(tr,c.enabled?'yes':'no');cell(tr,c.hasAuth?'set':'missing');
+    const authState=c.transport==='oauth'?(c.hasRefresh?(c.expiresAt?'token, exp '+new Date(c.expiresAt*1000).toLocaleTimeString():'token'):'NOT LOGGED IN'):(c.hasAuth?'set':'missing');
+    cell(tr,c.name);cell(tr,c.transport);cell(tr,c.orgId||'-');cell(tr,c.enabled?'yes':'no');cell(tr,authState);
     cell(tr,s?(s.hasData?s.lastOkAgoS+' s ago':'-')+(s.lastError?' / '+s.lastError+(s.httpStatus?' '+s.httpStatus:''):''):'-');
     const td=cell(tr,'');
     btn(td,'Edit',()=>editClaude(c));
+    if(c.transport==='oauth')btn(td,'Login',()=>startLogin(c.idx));
     btn(td,c.enabled?'Disable':'Enable',()=>post('/api/claude',{idx:c.idx,name:c.name,transport:c.transport,orgId:c.orgId,enabled:c.enabled?'0':'1'}).then(load).catch(e=>say(e.message)));
     btn(td,'Delete',()=>{if(confirm('Delete '+c.name+'?'))post('/api/claude/delete',{idx:c.idx}).then(load).catch(e=>say(e.message))},'danger');
     tb.appendChild(tr)}
 }
 function editClaude(c){const f=$('claudeForm');f.idx.value=c.idx;f.elements['name'].value=c.name;f.transport.value=c.transport;f.orgId.value=c.orgId;f.auth.value='';f.enabled.checked=c.enabled;
-  $('claudeFormTitle').textContent='Edit Claude profile';}
-function resetClaudeForm(){const f=$('claudeForm');f.reset();f.idx.value=-1;$('claudeFormTitle').textContent='Add Claude profile'}
-function saveClaude(ev){ev.preventDefault();const f=ev.target;const d=formData(f);if(!d.enabled)d.enabled='0';if(d.auth)d.changeAuth='1';
+  onTransport();$('claudeFormTitle').textContent='Edit Claude profile';}
+function onTransport(){const oauth=$('claudeForm').transport.value==='oauth';$('orgRow').style.display=oauth?'none':'block';$('authRow').style.display=oauth?'none':'block';$('oauthRow').style.display=oauth?'block':'none';}
+let loginIdx=-1;
+function startLogin(idx){loginIdx=idx;post('/api/oauth/start',{idx}).then(j=>{$('authUrl').textContent=j.authorizeUrl;$('authUrl').href=j.authorizeUrl;$('oauthCode').value='';$('loginFlow').style.display='block';say('Open the URL, approve, then paste the code');}).catch(e=>say(e.message));}
+function finishLogin(){post('/api/oauth/finish',{idx:loginIdx,code:$('oauthCode').value}).then(()=>{$('loginFlow').style.display='none';$('oauthCode').value='';say('Logged in');load();}).catch(e=>say(e.message));}
+function resetClaudeForm(){const f=$('claudeForm');f.reset();f.idx.value=-1;onTransport();$('claudeFormTitle').textContent='Add Claude profile'}
+function saveClaude(ev){ev.preventDefault();const f=ev.target;const d=formData(f);if(!d.enabled)d.enabled='0';if(d.transport==='oauth'){delete d.auth;delete d.orgId}else if(d.auth)d.changeAuth='1';
   post('/api/claude',d).then(()=>{say('Claude profile saved');resetClaudeForm();load()}).catch(e=>say(e.message));return false}
 
-function saveDisplay(ev){ev.preventDefault();post('/api/display',{rotationSec:$('rot').value}).then(()=>say('Display saved')).catch(e=>say(e.message));return false}
+function saveDisplay(ev){ev.preventDefault();Promise.all([post('/api/display',{rotationSec:$('rot').value}),post('/api/refresh',{refreshSec:$('refr').value})]).then(()=>say('Saved')).catch(e=>say(e.message));return false}
 
 load();setInterval(loadStatus,5000);
 </script></body></html>)HTML";

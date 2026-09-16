@@ -54,6 +54,8 @@ enum class FetchError : uint8_t {
   Parse,           // hibas/ismeretlen JSON
   ParserPending,   // a parser meg nincs kesz (valos mintara var)
   NotConfigured,   // hianyzik org-id vagy auth
+  ReloginRequired, // OAuth: a refresh token vegleg ervenytelen -> a felhasznalonak ujra be kell lepnie
+  RefreshFailed,   // OAuth: a token-frissites atmenetileg nem sikerult
 };
 
 const char *fetchErrorTitle(FetchError e);  // kijelzo 1. sor, pl. "CLAUDE AUTH"

@@ -15,6 +15,8 @@ const char *fetchErrorTitle(FetchError e) {
     case FetchError::Parse: return "USAGE PARSE";
     case FetchError::ParserPending: return "PARSER TODO";
     case FetchError::NotConfigured: return "NOT SET UP";
+    case FetchError::ReloginRequired: return "RE-LOGIN";
+    case FetchError::RefreshFailed: return "TOKEN REFRESH";
   }
   return "ERROR";
 }

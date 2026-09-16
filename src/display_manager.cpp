@@ -16,7 +16,7 @@ static bool fbOk = false;
 
 static const int W = 160, H = 80;
 static const uint32_t REDRAW_MS = 200;
-static const uint32_t STALE_AFTER_MS = 2UL * CLAUDE_REFRESH_PERIOD_S * 1000UL;
+static uint32_t g_staleMs = 2UL * CLAUDE_REFRESH_DEFAULT_S * 1000UL;  // a loop() a konfiguralt periodusbol frissiti
 
 // Font 1 = 6x8 GLCD, font 2 = 16 px (platformio.ini: LOAD_GLCD, LOAD_FONT2)
 static void text(const String &s, int x, int y, uint16_t color, uint8_t font = 1, uint8_t datum = TL_DATUM) {
@@ -128,6 +128,15 @@ void DisplayManager::drawProfile(int idx, const char *name) {
   ProfileUsage u = usageCache.get(idx);
   text(name, 0, 0, TFT_CYAN, 2);  // a profilnev mindig lathato (spec 12.)
 
+  // Beszedes ujra-belepes kepernyo (OAuth refresh token elhalt) — a regi adat felett is (spec 17.).
+  if (u.lastError == FetchError::ReloginRequired) {
+    text("!", W, 0, TFT_RED, 2, TR_DATUM);
+    text("RE-LOGIN NEEDED", W / 2, 24, TFT_RED, 2, TC_DATUM);
+    text("open setup page", W / 2, 46, TFT_LIGHTGREY, 1, TC_DATUM);
+    text("http://" + wifiManager.ipString(), W / 2, 58, TFT_CYAN, 1, TC_DATUM);
+    return;
+  }
+
   // Jobb felso sarok: allapot / adat kora
   uint32_t now = millis();
   String status;
@@ -142,7 +151,7 @@ void DisplayManager::drawProfile(int idx, const char *name) {
     status = String("ERR ") + (u.lastHttpStatus > 0 ? String(u.lastHttpStatus) : String(fetchErrorTitle(u.lastError)));
     sc = TFT_RED;
   }
-  bool stale = u.hasData && now - u.lastOkMs > STALE_AFTER_MS;
+  bool stale = u.hasData && now - u.lastOkMs > g_staleMs;
   if (u.hasData) {
     uint32_t ageS = (now - u.lastOkMs) / 1000;
     String age = ageS < 60 ? String(ageS) + "s" : ageS < 3600 ? String(ageS / 60) + "m OLD" : String(ageS / 3600) + "h OLD";
@@ -185,11 +194,9 @@ void DisplayManager::loop() {
     return;
   }
 
-  DeviceConfig cfg = configManager.snapshot();
-  int enabled[MAX_CLAUDE_PROFILES];
-  int n = 0;
-  for (int i = 0; i < MAX_CLAUDE_PROFILES; i++)
-    if (cfg.claude[i].used && cfg.claude[i].enabled) enabled[n++] = i;
+  ClaudeBrief b = configManager.brief();
+  g_staleMs = 2UL * (uint32_t)b.refreshSec * 1000UL;
+  int n = b.count;
 
   if (n == 0) {
     if (wifiManager.staConnected()) drawNoProfiles();
@@ -199,11 +206,11 @@ void DisplayManager::loop() {
   }
 
   // Rotacio: csak a megjelenitett profilt valtja, lekerest nem indit (spec 13.).
-  if (now - _rotSinceMs >= (uint32_t)cfg.rotationSec * 1000UL) {
+  if (now - _rotSinceMs >= (uint32_t)b.rotationSec * 1000UL) {
     _rotSinceMs = now;
     _rotPos++;
   }
-  int idx = enabled[_rotPos % n];
-  drawProfile(idx, cfg.claude[idx].name);
+  int slot = _rotPos % n;
+  drawProfile(b.idx[slot], b.name[slot]);
   push();
 }

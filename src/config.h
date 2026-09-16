@@ -17,7 +17,8 @@
 #define WIFI_PASS_MAX   64   // WPA2-PSK
 #define CLAUDE_NAME_MAX 12   // a 160 px szeles kijelzore
 #define CLAUDE_ORG_MAX  40   // UUID 36 + tartalek
-#define CLAUDE_AUTH_MAX 256  // ⚠ [feltarando] a valos session-/token-ertek hossza
+#define CLAUDE_AUTH_MAX 300  // access/refresh token, sessionKey — fejlecbe kerul (⚠ [feltarando] pontos hossz)
+#define CLAUDE_SCOPE_MAX 160 // OAuth scope-lista (az alap lista ~100 karakter)
 
 // --- Kijelzo ---
 #define ROTATION_MIN_S     1
@@ -31,17 +32,35 @@
 #define BOOT_LONGPRESS_MS        5000    // futas kozben hosszan nyomva -> setup AP
 
 // --- Claude transport ---
-// ⚠ NYITOTT DONTES (projektgazda): melyik uton kerjuk az adatot. Profilonkent valaszthato, egyik sincs beegetve.
-// A reszletek (host, path, fejlecek) egy helyen: claude_client.cpp kTransports[].
+// Dontes (projektgazda, 2026-09-16): ELSODLEGES az OAuth (on-device login + auto-refresh), a sessionKey masodlagos.
+// Profilonkent valaszthato; a reszletek (host, path, fejlecek) egy helyen: claude_client.cpp kTransports[].
 enum class ClaudeTransport : uint8_t {
-  WebSession = 0,  // claude.ai web + sessionKey suti — 200-as valasz ezen az uton MEG NEM mert
-  OAuth = 1,       // api.anthropic.com + OAuth Bearer — 200-as valasz mert (a koordinator, 2026-09-16)
+  OAuth = 0,       // api.anthropic.com + OAuth Bearer — ELSODLEGES; 200-as valasz mert (a koordinator, 2026-09-16)
+  WebSession = 1,  // claude.ai web + sessionKey suti — masodlagos; 200-as valasz ezen az uton MEG NEM mert
 };
 #define CLAUDE_TRANSPORT_COUNT 2
+#define CLAUDE_TRANSPORT_DEFAULT ((uint8_t)ClaudeTransport::OAuth)
+
+// --- OAuth (on-device login PKCE + auto-refresh) ---
+// Forras: helyi Claude Code 2.1.273 binaris (sha256 953e9880...), PLAN.md 2.8. Vegpontok/CLIENT_ID/PKCE onnan.
+// A refresh-logika mintaja: Data/erp-v1/.../Netatmo/NetatmoAccess.cs Refresh() (grant_type=refresh_token, mindharom
+// mezot frissiti+menti) — az elvet vettuk at, nem a C# szintaxist (PLAN.md 2.9).
+#define OAUTH_TOKEN_HOST     "platform.claude.com"
+#define OAUTH_TOKEN_PATH     "/v1/oauth/token"
+#define OAUTH_AUTHORIZE_URL  "https://claude.com/cai/oauth/authorize"
+#define OAUTH_REDIRECT_URI   "https://platform.claude.com/oauth/code/callback"  // manualis; a callback kiirja a "code#state"-et
+#define OAUTH_CLIENT_ID      "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+#define OAUTH_SCOPES         "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload user:plugins"
+#define OAUTH_REFRESH_MARGIN_S   300     // 5 perccel lejarat elott (a Claude Code isOAuthTokenExpired-je, PLAN 2.8)
+#define OAUTH_REFRESH_RETRY_S    120     // atmeneti frissitesi hiba utan
+#define OAUTH_LOGIN_TTL_MS       600000  // fuggoben levo login (verifier/state) elettartama
 
 // --- Claude refresh (spec 14.) ---
-#define CLAUDE_REFRESH_PERIOD_S   60
-#define CLAUDE_BACKOFF_MAX_S      900    // atmeneti hibanal legfeljebb 15 perc
+// A usage lassan valtozik -> konzervativ, KONFIGURALHATO alap (projektgazda: max uptime, kis labnyom).
+#define CLAUDE_REFRESH_DEFAULT_S  180
+#define REFRESH_PERIOD_MIN_S      60
+#define REFRESH_PERIOD_MAX_S      3600
+#define CLAUDE_BACKOFF_MAX_S      1800   // atmeneti hibanal legfeljebb 30 perc
 #define CLAUDE_AUTH_BACKOFF_S     600    // 401/403: a szerver x-should-retry: false-t kuld (mert, PLAN.md 2.2)
 #define CLAUDE_HTTP_TIMEOUT_MS    10000
 #define CLAUDE_MAX_BODY_BYTES     16384

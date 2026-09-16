@@ -7,6 +7,7 @@
 #include "claude_client.h"
 #include "config.h"
 #include "config_manager.h"
+#include "oauth_client.h"
 #include "refresh_scheduler.h"
 #include "time_manager.h"
 #include "usage_cache.h"
@@ -144,9 +145,12 @@ static void handleConfig() {
     o["transport"] = transportName((ClaudeTransport)p.transport);
     o["orgId"] = p.orgId;
     o["enabled"] = p.enabled;
-    o["hasAuth"] = p.auth[0] != '\0';  // az auth maga SOHA
+    o["hasAuth"] = p.auth[0] != '\0';       // access token / sessionKey — az ertek SOHA
+    o["hasRefresh"] = p.refresh[0] != '\0';  // OAuth refresh token — az ertek SOHA
+    o["expiresAt"] = (long)p.expiresAt;
   }
   doc["rotationSec"] = cfg.rotationSec;
+  doc["refreshSec"] = cfg.refreshSec;
   doc["maxWifi"] = MAX_WIFI_PROFILES;
   doc["maxClaude"] = MAX_CLAUDE_PROFILES;
   sendJson(200, doc);
@@ -212,17 +216,27 @@ static void handleClaudeSave() {
   if (!org.isEmpty() && !isValidOrgId(org.c_str())) return sendError(400, "Organization ID must be a UUID or empty");
 
   ClaudeProfile p = cfg.claude[idx];
-  // Transport-valtaskor a regi titok mas tipusu (suti vs. token) -> uj ertek kell.
-  if (p.used && p.transport != transport && !argBool("changeAuth")) return sendError(400, "transport changed: enter the new auth value");
+  bool transportChanged = p.used && p.transport != transport;
+  if (transportChanged) {  // masik ut -> a regi titkok ervenytelenek
+    p.auth[0] = p.refresh[0] = p.scope[0] = '\0';
+    p.expiresAt = 0;
+  }
   p.transport = (uint8_t)transport;
-  if (!p.used || argBool("changeAuth")) {
-    String auth = server.arg("auth");
-    auth.trim();
-    // Fejlec-injektalas ellen: csak lathato ASCII, szokoz/;/, nelkul (sutiertekbe kerul).
-    if (auth.length() > CLAUDE_AUTH_MAX || !printableAscii(auth, false) || auth.indexOf(';') >= 0 || auth.indexOf(',') >= 0)
-      return sendError(400, "auth: max 256 visible ASCII chars, no ; or ,");
-    if (auth.isEmpty()) return sendError(400, "auth value required");
-    strlcpy(p.auth, auth.c_str(), sizeof(p.auth));
+
+  if (transport == (int)ClaudeTransport::OAuth) {
+    // OAuth: a tokeneket NEM ez a form adja, hanem az on-device login (handleOAuthFinish).
+    // Itt csak nev/engedelyezes/uj-profil. A meglevo tokenek megmaradnak (p a snapshotbol jott).
+  } else {
+    // WebSession: sessionKey kezi megadasa.
+    if (!p.used || transportChanged || argBool("changeAuth")) {
+      String auth = server.arg("auth");
+      auth.trim();
+      // Fejlec-injektalas ellen: csak lathato ASCII, szokoz/;/, nelkul (sutiertekbe kerul).
+      if (auth.length() > CLAUDE_AUTH_MAX || !printableAscii(auth, false) || auth.indexOf(';') >= 0 || auth.indexOf(',') >= 0)
+        return sendError(400, "auth: max 300 visible ASCII chars, no ; or ,");
+      if (auth.isEmpty()) return sendError(400, "sessionKey value required");
+      strlcpy(p.auth, auth.c_str(), sizeof(p.auth));
+    }
   }
   strlcpy(p.name, name.c_str(), sizeof(p.name));
   strlcpy(p.orgId, org.c_str(), sizeof(p.orgId));
@@ -231,9 +245,76 @@ static void handleClaudeSave() {
   sendOk();
 }
 
+// --- OAuth on-device login (PKCE) ---
+// Egyszerre egy fuggoben levo login (egy admin egy eszkozt allit be). Csak RAM-ban.
+static struct {
+  bool active = false;
+  int idx = -1;
+  uint32_t editSeq = 0;
+  uint32_t startedMs = 0;
+  String verifier;
+  String state;
+} g_login;
+
+static void handleOAuthStart() {
+  if (!guardPost()) return;
+  int idx = argInt("idx", -1);
+  if (idx < 0 || idx >= MAX_CLAUDE_PROFILES) return sendError(400, "bad idx");
+  DeviceConfig cfg = configManager.snapshot();
+  if (!cfg.claude[idx].used || cfg.claude[idx].transport != (uint8_t)ClaudeTransport::OAuth)
+    return sendError(400, "not an OAuth profile");
+  OAuthLogin lg;
+  if (!oauthBeginLogin(lg)) return sendError(500, "PKCE init failed");
+  g_login.active = true;
+  g_login.idx = idx;
+  g_login.editSeq = cfg.claude[idx].editSeq;
+  g_login.startedMs = millis();
+  g_login.verifier = lg.verifier;
+  g_login.state = lg.state;
+  JsonDocument doc;
+  doc["ok"] = true;
+  doc["authorizeUrl"] = lg.authorizeUrl;  // NEM titok; a verifier/state a RAM-ban marad
+  sendJson(200, doc);
+}
+
+static void handleOAuthFinish() {
+  if (!guardPost()) return;
+  int idx = argInt("idx", -1);
+  if (!g_login.active || g_login.idx != idx) return sendError(400, "no pending login for this profile");
+  if (millis() - g_login.startedMs > OAUTH_LOGIN_TTL_MS) {
+    g_login.active = false;
+    return sendError(408, "login expired, start again");
+  }
+  String code = server.arg("code");
+  code.trim();
+  if (code.isEmpty()) return sendError(400, "paste the code#state value");
+  // Blokkolo (TLS + kodcsere) — a felhasznalo varja; a setup-oldal addig is fut.
+  OAuthTokens t = oauthExchangeCode(code, g_login.verifier, g_login.state);
+  if (!t.ok) {
+    // A hibaszoveg beszedes (pl. "state mismatch", "400 invalid_grant"), titkot nem tartalmaz.
+    return sendError(400, t.error.length() ? t.error.c_str() : "token exchange failed");
+  }
+  uint32_t exp = t.expiresIn ? (uint32_t)(timeManager.now() + t.expiresIn) : 0;
+  bool ok = configManager.saveOAuthTokens(idx, g_login.editSeq, t.access.c_str(), t.refresh.c_str(), exp,
+                                          t.scope.c_str());
+  g_login.active = false;
+  g_login.verifier = "";  // titok torlese a RAM-bol
+  g_login.state = "";
+  if (!ok) return sendError(409, "profile changed during login, try again");
+  sendOk();
+}
+
 static void handleClaudeDelete() {
   if (!guardPost()) return;
   if (!configManager.deleteClaude(argInt("idx", -1))) return sendError(400, "bad idx");
+  sendOk();
+}
+
+static void handleRefresh() {
+  if (!guardPost()) return;
+  int sec = argInt("refreshSec", -1);
+  if (sec < REFRESH_PERIOD_MIN_S || sec > REFRESH_PERIOD_MAX_S) return sendError(400, "refresh 60-3600 sec");
+  if (!configManager.saveRefreshSec((uint16_t)sec)) return sendError(500, "save failed");
   sendOk();
 }
 
@@ -315,6 +396,9 @@ void WebSetup::begin() {
   server.on("/api/claude", HTTP_POST, handleClaudeSave);
   server.on("/api/claude/delete", HTTP_POST, handleClaudeDelete);
   server.on("/api/display", HTTP_POST, handleDisplay);
+  server.on("/api/refresh", HTTP_POST, handleRefresh);
+  server.on("/api/oauth/start", HTTP_POST, handleOAuthStart);
+  server.on("/api/oauth/finish", HTTP_POST, handleOAuthFinish);
   server.on("/api/scan", HTTP_POST, handleScanStart);
   server.on("/api/scan", HTTP_GET, handleScanResults);
   server.on("/api/restart", HTTP_POST, handleRestart);

@@ -6,8 +6,8 @@ beépített 160×80-as kijelzőn váltogatja több Claude-fiók adatait. Nincs k
 Spec: [`../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md`](../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md) ·
 Mért alapok, döntések: [`PLAN.md`](PLAN.md)
 
-> **Állapot (2026-09-16):** a firmware fordul, de **vason még nem futott**. A usage-feldolgozás a valós
-> válasz-mintához igazítva. **Nyitott döntés:** melyik úton kérje az adatot (claude.ai web vagy OAuth, 11–12.).
+> **Állapot (2026-09-16):** a firmware fordul, de **vason még nem futott**. Az adatlekérés elsődleges útja az
+> **OAuth on-device bejelentkezés + automatikus tokenfrissítés** (11.); a sessionKey másodlagos opció.
 > Amit itt `⚠ [vason mérendő]` jelöl, az a forrásból következik, nem mérésből.
 
 ---
@@ -117,8 +117,8 @@ Szerkesztésnél az üresen hagyott jelszómező megtartja a tároltat. Nyílt h
 
 ## 9. Több Claude profil
 
-Legfeljebb **5** profil: név (max. 12 karakter, a kijelzőn mindig látszik), Source (claude.ai web vagy
-OAuth, lásd 11.), Organization ID (UUID, csak a web úthoz), session/token érték (jelszómező), engedélyezve.
+Legfeljebb **5** profil: név (max. 12 karakter, a kijelzőn mindig látszik), Source (OAuth vagy claude.ai web,
+lásd 11.), engedélyezve. OAuth-nál a tokent a bejelentkezés adja; web-nél Organization ID + sessionKey.
 
 - Minden profil saját cache-t kap. Hiba esetén az utolsó érvényes adat megmarad, és a kijelző mutatja a korát.
 - Profilonként **60 s**-onként frissít, a profilok egyenletesen eltolva (3 profil: 0 / 20 / 40 s).
@@ -129,9 +129,10 @@ OAuth, lásd 11.), Organization ID (UUID, csak a web úthoz), session/token ért
 
 ## 10. Display rotation
 
-A setup-oldal **Display** részén 1–60 s (alapérték 5 s). A váltás **csak a megjelenített profilt**
-cseréli, lekérést nem indít: 1 s-os rotációnál is profilonként 60 s marad a frissítés. A setup-oldal
-„Claude requests since boot" számlálója ezt mutatja.
+A setup-oldal **Display & refresh** részén: profil-rotáció 1–60 s (alap 5 s), és a **usage-frissítés
+profilonként 60–3600 s (alap 180 s)** — a usage lassan változik, a konzervatív alap kíméli a keretet és
+csökkenti a lábnyomot. A rotáció **csak a megjelenített profilt** cseréli, lekérést nem indít: 1 s-os
+rotációnál is a beállított frissítési idő marad. A „Claude requests since boot" számláló ezt mutatja.
 
 Kijelző-elrendezés:
 
@@ -149,26 +150,36 @@ A jobb felső sarokban az adat kora (`3m OLD` sárgán, ha régebbi 2 percnél),
 
 ## 11. Claude authentication
 
-Claude-profilonként a **Source** mezőben két út közül lehet választani. ⚠ **Hogy melyik legyen a végleges, az még
-nyitott döntés** ([`PLAN.md`](PLAN.md) 2.7).
+Claude-profilonként a **Source** mezőben két út közül lehet választani (elsődleges: OAuth).
 
-| Source | Mit kell megadni | Mért állapot |
-|---|---|---|
-| `claude.ai web (sessionKey cookie)` | Organization ID (UUID) + a `sessionKey` süti értéke | hamis sütivel: a szerver felismeri; **érvényessel 200-as válasz nincs mérve** |
-| `api.anthropic.com (OAuth token)` | OAuth access token (`sk-ant-oat01-…`), org-ID nem kell | **200 + valós válasz mérve** (2026-09-16) |
+### OAuth — on-device bejelentkezés + automatikus frissítés (ajánlott)
 
-A firmware által küldött fejlécek (`src/claude_client.cpp`, `kTransports[]`):
+Cél: egyszeri bejelentkezés után az eszköz **magától** frissíti a tokent, és beavatkozás nélkül fut.
 
-- web: `Cookie: sessionKey=<érték>`, `anthropic-client-platform: web_claude_ai`
-  (utóbbi forrása: `linuxlewis/claude-usage` `UsageService.swift:30`);
-- OAuth: `Authorization: Bearer <token>`, `anthropic-beta: oauth-2025-04-20`.
+1. Hozz létre egy Claude-profilt `Source = OAuth`-tal (org-ID és kézi token nem kell), mentsd el.
+2. A profil sorában **Login**: az eszköz mutat egy bejelentkezési URL-t.
+3. Nyisd meg egy eszközön, ahol be vagy jelentkezve a Claude-ba, hagyd jóvá.
+4. A megjelenő oldal ad egy kódot (`code#state` alak). Másold be a setup-oldalra.
+5. Az eszköz tokenre cseréli, NVS-be írja, és onnantól **5 perccel lejárat előtt automatikusan frissít**.
 
-⚠ **[feltárandó]** Az OAuth access token lejárata. A firmware tokent **nem frissít**: ha a token lejár,
-`CLAUDE AUTH` / `ERROR 401` jelenik meg, és új értéket kell beírni.
-⚠ **[feltárandó]** Hogy honnan és hogyan kell az értékeket kimásolni. Ezt a transport-döntés után írjuk le.
+- **Dedikált token:** a saját bejelentkezésed külön tokent ad, ezért nem ütközik a gépeden futó Claude Code-dal.
+- Ha a frissítő token véglegesen érvénytelen lesz, a kijelzőn **RE-LOGIN NEEDED**, és a fenti lépéseket meg kell ismételni.
+- Végpontok/azonosító a Claude Code kliensből (forrás: [`PLAN.md`](PLAN.md) 2.8–2.9). PKCE S256 + state (CSRF).
 
-A tárolt érték soha nem jelenik meg újra: a setup-oldal csak `set` / `missing` jelzést mutat. Szerkesztésnél az
-üresen hagyott mező megtartja, Source-váltáskor új értéket kér.
+### sessionKey (claude.ai web) — másodlagos, kézi
+
+`Source = claude.ai web`: Organization ID (UUID) + a `sessionKey` süti értéke. Nincs automatikus frissítés;
+a linuxlewis `SPEC.md` szerint a süti ~30 napos, tehát időnként újra be kell másolni. ⚠ Ezen az úton a 200-as
+választ még nem mértük.
+
+A tárolt titkok (access/refresh token, sessionKey) soha nem jelennek meg újra: a setup-oldal csak az állapotot
+mutatja (nincs bejelentkezve / token, lejárat / set). NVS-ben tárolva, nem logolva, a kijelzőn nem látszanak.
+
+⚠ **[vason mérendő]** a teljes bejelentkezési és frissítési folyamat (dedikált tokennel); hogy a callback-oldal
+`code#state` alakban ad-e kódot; a frissítő token élettartama.
+
+⚠ Az eszköz a Claude Code OAuth-kliensazonosítójával lép fel. Ez nem harmadik félnek szánt API; az Anthropic
+feltételei szerint kifogásolható lehet. Személyes, saját usage-figyelésre, a projektgazda vállalásával.
 
 ## 12. Endpoint
 
@@ -200,7 +211,9 @@ OAuth: GET https://api.anthropic.com/api/oauth/usage
 | `NO INTERNET` | DNS/TCP/TLS hiba | hálózat; ha tartós: tanúsítványlánc-váltás (12.) |
 | `TIMEOUT` | 10 s alatt nem jött válasz | automatikusan újrapróbál |
 | `CLOUDFLARE` / `ERROR 403` | Cloudflare-kihívás, nem jutott el a Claude-ig | ⚠ [vason mérendő] a fő kockázat, lásd PLAN 2.1 |
-| `CLAUDE AUTH` / `ERROR 403` vagy `401` | lejárt vagy rossz session/token (OAuth-nál a lejárat valószínű, lásd 11.) | új érték a profilba |
+| `RE-LOGIN NEEDED` | OAuth: a frissítő token véglegesen érvénytelen | jelentkezz be újra (11.) |
+| `TOKEN REFRESH` | OAuth: a tokenfrissítés átmenetileg nem sikerült | automatikusan újrapróbál |
+| `CLAUDE AUTH` / `ERROR 403` vagy `401` | lejárt vagy rossz session/token | OAuth-nál magától frissít; sessionKey-nél új érték a profilba |
 | `RATE LIMIT` / `ERROR 429` | túl sok kérés — vagy api.anthropic.com-on hiányzó hitelesítés (mérve) | automatikus visszalépés, `Retry-After` szerint |
 | `CLAUDE HTTP` / `ERROR nnn` | egyéb HTTP-hiba | a soros napló a státuszkódot kiírja |
 | `USAGE PARSE` | a válasz nem JSON, vagy se `limits[]` session/weekly, se `five_hour`/`seven_day` nincs benne | a Claude API változhatott → `usage_parser` |
@@ -235,8 +248,8 @@ Elfelejtett admin-jelszó: forced setup (7.), abban a módban nem kell jelszó.
   források ellentmondanak), TLS-kézfogás heap- és stackigénye, Wi-Fi-állapotgép, webszerver.
 - **A Cloudflare dönthet úgy, hogy az ESP32-t nem engedi át** (más TLS-ujjlenyomat, mint a curl-é).
   Ez a projekt fő kockázata.
-- A transport (web vs. OAuth) nyitott. A web úton a `200`-as válasz nincs mérve, az OAuth-token lejárata
-  feltárandó, és a firmware tokent nem frissít.
+- Az OAuth login/refresh **vason még nem futott**. A web (sessionKey) úton a `200`-as válasz nincs mérve.
+  A frissítő token élettartama feltárandó (addig nem tudni, mikor kell mégis újra belépni).
 - Nem hivatalos API: a Claude bármikor megváltoztathatja. A javítás helye a `claude_client` (`kTransports[]`) és a `usage_parser`.
 - Rejtett (nem sugárzott) SSID nem támogatott.
 - A tanúsítványlánc gyökere változhat (Cloudflare kiadót válthat) → új gyökér a `src/ca_certs.h`-ba.
