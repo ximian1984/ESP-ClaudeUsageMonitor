@@ -48,16 +48,17 @@ cd ClaudeUsageMonitor
 pio run
 ```
 
-Mérve: `SUCCESS`, RAM 15,3 %, Flash 14,9 %.
+Mérve: `SUCCESS`, RAM 15,3 %, Flash 15,2 %.
 
 ⚠ **Zsákutca:** `pio run -v` (bőbeszédű mód) tiszta buildnél `FAILED`-et ad a `firmware.bin` lépésnél:
 `TypeError: unsupported operand type(s) for +: '_Null' and 'str'`. Ez a PlatformIO 6.2.0 kiírásának
 hibája, nem a kódé: ugyanaz a tiszta build `-v` nélkül `SUCCESS`, és elkészül a `firmware.bin`.
 
-Gépi teszt a hardverfüggetlen részekre (idő-parszolás, formázás):
+Gépi teszt a hardverfüggetlen részekre (idő-parszolás, formázás, usage-parser kapuval és anélkül).
+Az ArduinoJson-t a PlatformIO letöltéséből veszi, ezért előbb egy `pio run` kell:
 
 ```sh
-sh test/host/run.sh     # fails=0
+sh test/host/run.sh     # fails=0, parser fails=0, parser fails=0
 ```
 
 ## 5. Upload
@@ -154,6 +155,8 @@ A jobb felső sarokban az adat kora (`3m OLD` sárgán, ha régebbi 2 percnél),
   sütit külön ágon kezeli.
 - A firmware jelenleg **ideiglenesen** `Cookie: sessionKey=<a beírt érték>`-et küld
   (`src/claude_client.cpp`, `applyAuth()`).
+- Egy közösségi macOS-app forrása (`linuxlewis/claude-usage`, 2026-02) ugyanezt a sütit küldi, plusz egy
+  `anthropic-client-platform: web_claude_ai` fejlécet. Ez utóbbit a firmware most nem küldi ([`PLAN.md`](PLAN.md) 2.5).
 - A végleges alakot és azt, hogy honnan kell kimásolni az értéket, a projektgazda valós mintája dönti el.
   Addig ez a szakasz szándékosan nem ad lépéseket.
 
@@ -172,7 +175,10 @@ Nem hivatalos, nem stabil API. Mérve, hitelesítés nélkül ([`PLAN.md`](PLAN.
   a Cloudflare kihívást ad (`403`, `cf-mitigated: challenge`).
 - Rossz alakú UUID: `400 invalid_request_error`. Hiányzó vagy rossz session: `403 permission_error`,
   `error_code: account_session_invalid`.
-- A sikeres (`200`) válasz szerkezete **még nincs mérve** → a parser csonk.
+- A sikeres (`200`) válasz szerkezete **még nincs mérve**. A parser két közösségi forrásból ismert alakot
+  kezel (legfelső szintű `five_hour`/`seven_day` `utilization`+`resets_at`, illetve `raw_limits` tokenekkel),
+  de **kapuzott**: alapbuildben `PARSER TODO`-t ad. Vason-próbához:
+  `PLATFORMIO_BUILD_FLAGS="-DUSAGE_PARSER_ENABLE=1" pio run -t upload`. Részletek: [`PLAN.md`](PLAN.md) 2.5.
 
 TLS: tanúsítvány-ellenőrzés az ISRG Root X1 és X2 gyökérrel (`src/ca_certs.h`). A lánc 2026-09-16-án:
 Let's Encrypt YE2 → ISRG Root YE → X2 → X1.
@@ -190,8 +196,8 @@ Let's Encrypt YE2 → ISRG Root YE → X2 → X1.
 | `CLAUDE AUTH` / `ERROR 403` vagy `401` | lejárt vagy rossz session | új session-érték a profilba |
 | `RATE LIMIT` / `ERROR 429` | túl sok kérés | automatikus visszalépés |
 | `CLAUDE HTTP` / `ERROR nnn` | egyéb HTTP-hiba | a soros napló a státuszkódot kiírja |
-| `USAGE PARSE` | a válasz nem értelmezhető JSON | a Claude API változhatott → `usage_parser` |
-| `PARSER TODO` | a parser még nincs megírva | valós mintára vár |
+| `USAGE PARSE` | a válasz nem JSON, vagy nincs benne sem `five_hour`, sem `seven_day` | a Claude API változhatott → `usage_parser` |
+| `PARSER TODO` | a válasz felismert alakú, de a parser kapuja zárva | valós mintára vár (README 12.) |
 | `NOT SET UP` | hiányzik az Organization ID vagy az auth | setup-oldal |
 
 Elfelejtett admin-jelszó: forced setup (7.), abban a módban nem kell jelszó.

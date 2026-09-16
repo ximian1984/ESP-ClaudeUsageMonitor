@@ -8,3 +8,7 @@
 struct String : std::string { using std::string::string; String(const char*s):std::string(s){} String(const std::string&s):std::string(s){} };
 inline uint32_t millis(){return 0;}
 inline void configTzTime(const char*,const char*,const char*){}
+#include <cctype>
+#include <cstdarg>
+struct HostSerial { void printf(const char *f, ...) { va_list a; va_start(a, f); vprintf(f, a); va_end(a); } };
+inline HostSerial Serial;
