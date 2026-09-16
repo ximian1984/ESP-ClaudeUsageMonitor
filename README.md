@@ -153,10 +153,9 @@ A jobb felső sarokban az adat kora (`3m OLD` sárgán, ha régebbi 2 percnél),
 
 - Amit mértünk (hamis értékekkel, [`PLAN.md`](PLAN.md) 2.3): a szerver a `sessionKey=sk-ant-sid01-…`
   sütit külön ágon kezeli.
-- A firmware jelenleg **ideiglenesen** `Cookie: sessionKey=<a beírt érték>`-et küld
-  (`src/claude_client.cpp`, `applyAuth()`).
-- Egy közösségi macOS-app forrása (`linuxlewis/claude-usage`, 2026-02) ugyanezt a sütit küldi, plusz egy
-  `anthropic-client-platform: web_claude_ai` fejlécet. Ez utóbbit a firmware most nem küldi ([`PLAN.md`](PLAN.md) 2.5).
+- A firmware jelenleg **ideiglenesen** `Cookie: sessionKey=<a beírt érték>` és
+  `anthropic-client-platform: web_claude_ai` fejlécet küld (`src/claude_client.cpp`, `applyAuth()`).
+  Ugyanezt küldi egy közösségi macOS-app is (`linuxlewis/claude-usage`, 2026-02; [`PLAN.md`](PLAN.md) 2.5).
 - A végleges alakot és azt, hogy honnan kell kimásolni az értéket, a projektgazda valós mintája dönti el.
   Addig ez a szakasz szándékosan nem ad lépéseket.
 

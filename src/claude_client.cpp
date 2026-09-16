@@ -45,6 +45,11 @@ bool isValidOrgId(const char *s) {
 // Hogy ez ONMAGABAN eleg-e, es kell-e mas suti/fejlec, csak valos session-nel derul ki.
 // A mechanizmus egyetlen helyen van, hogy a valos minta utan itt lehessen javitani.
 static void applyAuth(HTTPClient &http, const char *auth) {
+  // Forras: github.com/linuxlewis/claude-usage @ ac15351, ClaudeUsage/Services/UsageService.swift:30-31 —
+  // a webes kliens ezt a ket fejlecet kuldi. A platform-fejlec hitelesites nelkul nem valtoztat a valaszon
+  // (mert 2026-09-16, hamis sessionKey-jel: ugyanaz a 403 account_session_invalid, Cloudflare-kihivas nelkul);
+  // hogy ervenyes session mellett kell-e, az ⚠ [feltarando].
+  http.addHeader("anthropic-client-platform", "web_claude_ai");
   String cookie = String("sessionKey=") + auth;
   http.addHeader("Cookie", cookie);
   // A cookie String itt kiesik a scope-bol; a HTTPClient masolatot tart. Logba NEM kerul.
