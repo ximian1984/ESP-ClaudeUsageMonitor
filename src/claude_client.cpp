@@ -104,7 +104,8 @@ ClaudeResponse fetchUsage(ClaudeTransport transport, const char *orgId, const ch
   http.setConnectTimeout(CLAUDE_HTTP_TIMEOUT_MS);
   http.setTimeout(CLAUDE_HTTP_TIMEOUT_MS);
   http.setReuse(false);
-  // HTTP/1.1 marad (alapertelmezett). Mert: HTTP/1.1-en a Cloudflare atengedett, HTTP/2-n kihivast adott.
+  // HTTP/1.1 marad (alapertelmezett). Mert (claude.ai, sessionKey-ut): HTTP/1.1-en a Cloudflare atengedett, HTTP/2-n
+  // kihivast adott. Az OAuth-ut (api.anthropic.com) HTTP/1.1-en kihivas nelkul valaszol.
   // A User-Agent az alapertelmezett "ESP32HTTPClient" — curl-lal ezzel a UA-val mert atjutas (PLAN.md 2.1).
 
   String url = String("https://") + ts->host + ts->pathPrefix;

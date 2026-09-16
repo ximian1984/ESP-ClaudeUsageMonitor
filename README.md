@@ -210,7 +210,7 @@ OAuth: GET https://api.anthropic.com/api/oauth/usage
 | `waiting NTP` / `NTP ERR` / `RESET ? (NO TIME)` | nincs pontos idő (TLS-hez is kell) | internetkapcsolat, UDP 123 engedélyezése |
 | `NO INTERNET` | DNS/TCP/TLS hiba | hálózat; ha tartós: tanúsítványlánc-váltás (12.) |
 | `TIMEOUT` | 10 s alatt nem jött válasz | automatikusan újrapróbál |
-| `CLOUDFLARE` / `ERROR 403` | Cloudflare-kihívás, nem jutott el a Claude-ig | ⚠ [vason mérendő] a fő kockázat, lásd PLAN 2.1 |
+| `CLOUDFLARE` / `ERROR 403` | Cloudflare-kihívás a claude.ai-on — **csak sessionKey (web) profilnál** várható; az OAuth-út hosztjai nem adnak kihívást (mérve) | sessionKey-nél: ⚠ [vason mérendő], lásd PLAN 2.1; javasolt OAuth-profilra váltani |
 | `RE-LOGIN NEEDED` | OAuth: a frissítő token véglegesen érvénytelen | jelentkezz be újra (11.) |
 | `TOKEN REFRESH` | OAuth: a tokenfrissítés átmenetileg nem sikerült | automatikusan újrapróbál |
 | `CLAUDE AUTH` / `ERROR 403` vagy `401` | lejárt vagy rossz session/token | OAuth-nál magától frissít; sessionKey-nél új érték a profilba |
@@ -246,8 +246,9 @@ Elfelejtett admin-jelszó: forced setup (7.), abban a módban nem kell jelszó.
 
 - **Vason még semmi nem futott.** Nincs mérve: kijelző-orientáció, háttérfény-polaritás (a LilyGO
   források ellentmondanak), TLS-kézfogás heap- és stackigénye, Wi-Fi-állapotgép, webszerver.
-- **A Cloudflare dönthet úgy, hogy az ESP32-t nem engedi át** (más TLS-ujjlenyomat, mint a curl-é).
-  Ez a projekt fő kockázata.
+- **Csak a sessionKey (claude.ai) tartalék-úton:** a Cloudflare dönthet úgy, hogy az ESP32-t nem engedi át (más
+  TLS-ujjlenyomat, mint a curl-é). Az elsődleges OAuth-utat ez nem érinti: az eszköz ott csak az `api.anthropic.com`-ot
+  és a `platform.claude.com`-ot hívja, ezek nem adnak kihívást (mérve), a login pedig a telefonon zajlik.
 - Az OAuth login/refresh **vason még nem futott**. A web (sessionKey) úton a `200`-as válasz nincs mérve.
   A frissítő token élettartama feltárandó (addig nem tudni, mikor kell mégis újra belépni).
 - Nem hivatalos API: a Claude bármikor megváltoztathatja. A javítás helye a `claude_client` (`kTransports[]`) és a `usage_parser`.
