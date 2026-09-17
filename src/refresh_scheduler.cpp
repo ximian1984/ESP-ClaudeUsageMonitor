@@ -100,7 +100,8 @@ void RefreshScheduler::run() {
 
     if (configManager.version() != seenVersion) {
       seenVersion = configManager.version();
-      DeviceConfig cfg = configManager.snapshot();
+      auto cfgHeap = configManager.heapSnapshot();
+  DeviceConfig &cfg = *cfgHeap;
       periodMs = (uint32_t)cfg.refreshSec * 1000UL;
       int n = 0;
       for (int i = 0; i < MAX_CLAUDE_PROFILES; i++)
@@ -140,7 +141,8 @@ void RefreshScheduler::run() {
     FetchError err;
     ClaudeResponse resp;
     {
-      DeviceConfig cfg = configManager.snapshot();
+      auto cfgHeap = configManager.heapSnapshot();
+  DeviceConfig &cfg = *cfgHeap;
       const ClaudeProfile &c = cfg.claude[pick];
       String access;
       err = ensureOAuthToken(pick, c, access);  // OAuth: auto-refresh a lekeres elott
@@ -170,7 +172,7 @@ void RefreshScheduler::run() {
     resp.body = "";  // felszabaditas
 
     // Kozben modosult/torolt profil: az eredmeny mar nem ehhez a profilhoz tartozik.
-    if (identity[pick] != profileIdentity(configManager.snapshot().claude[pick])) continue;
+    if (identity[pick] != profileIdentity(configManager.heapSnapshot()->claude[pick])) continue;
 
     uint32_t done = millis();
     if (err == FetchError::None) {

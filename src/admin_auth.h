@@ -13,6 +13,8 @@ class AdminAuth {
 
   enum class LoginResult : uint8_t { Ok, Wrong, LockedOut };
   LoginResult login(const String &password, String &tokenOut);
+  // Csak ellenorzes (pl. titkositott exporthoz), token nelkul; a hibas probalkozas ugyanugy zarol, mint a login.
+  LoginResult checkPassword(const String &password);
   // touch=true: a lejarat csuszik (felhasznaloi muvelet). Az 5 s-os status-poll touch=false-szal hiv, kulonben a nyitva
   // hagyott oldal soha nem jarna le.
   bool tokenValid(const String &token, bool touch = true);
@@ -23,6 +25,7 @@ class AdminAuth {
 
  private:
   bool verify(const String &password);
+  LoginResult login(const String &password, String &tokenOut, bool issueToken);
   bool _set = false;
   uint8_t _salt[16] = {0};
   uint8_t _hash[32] = {0};

@@ -1,6 +1,8 @@
 // Konfiguracio NVS-ben (Preferences). Titkot soha nem logol.
 #pragma once
 #include <Arduino.h>
+
+#include <memory>
 #include "config.h"
 
 struct WifiProfile {
@@ -51,6 +53,9 @@ class ConfigManager {
 
   // Olvasas: masolat, mutex alatt (a fetch-task is olvas).
   DeviceConfig snapshot();
+  // Heapen levo masolat. A DeviceConfig 20 Wi-Fi-profillal ~6,2 KB: stacken tobb helyen masolva a loopTask
+  // tartaleka 1580 B-ra fogyott (vason mert, 2026-09-17) -> minden task-kodban ezt hasznaljuk.
+  std::unique_ptr<DeviceConfig> heapSnapshot();
   // Masolat a hivo altal adott (pl. heapen levo) peldanyba — a ~6 KB-os DeviceConfig ne a stacken legyen.
   void copyTo(DeviceConfig &out);
   // Import: az osszes Wi-Fi- es Claude-slot + rotacio/frissites/TZ cserje (az AP-jelszo marad). A hivo validal.

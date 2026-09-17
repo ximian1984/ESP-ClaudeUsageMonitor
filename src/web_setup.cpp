@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "admin_auth.h"
+#include "backup_crypto.h"
 #include "claude_client.h"
 #include "config.h"
 #include "config_manager.h"
@@ -122,9 +123,12 @@ static void handleStatus() {
   doc["tz"] = timeManager.timezone();
   doc["uptimeS"] = millis() / 1000;
   doc["freeHeap"] = ESP.getFreeHeap();
+  doc["minFreeHeap"] = ESP.getMinFreeHeap();
+  doc["loopStackFreeMin"] = uxTaskGetStackHighWaterMark(nullptr);  // a loopTask eletideje alatti legkisebb szabad stack (B)
   doc["claudeFetchCount"] = refreshScheduler.fetchCount();
 
-  DeviceConfig cfg = configManager.snapshot();
+  auto cfgHeap = configManager.heapSnapshot();
+  DeviceConfig &cfg = *cfgHeap;
   time_t lastUpdate = 0;
   JsonArray arr = doc["claude"].to<JsonArray>();
   for (int i = 0; i < MAX_CLAUDE_PROFILES; i++) {
@@ -155,7 +159,8 @@ static void handleStatus() {
 
 static void handleConfig() {
   if (!guardRead()) return;
-  DeviceConfig cfg = configManager.snapshot();
+  auto cfgHeap = configManager.heapSnapshot();
+  DeviceConfig &cfg = *cfgHeap;
   JsonDocument doc;
   JsonArray wa = doc["wifi"].to<JsonArray>();
   for (int i = 0; i < MAX_WIFI_PROFILES; i++) {
@@ -205,7 +210,8 @@ static void reselectIfAffected(const char *oldSsid, const char *newSsid) {
 
 static void handleWifiSave() {
   if (!guardPost()) return;
-  DeviceConfig cfg = configManager.snapshot();
+  auto cfgHeap = configManager.heapSnapshot();
+  DeviceConfig &cfg = *cfgHeap;
   bool used[MAX_WIFI_PROFILES];
   for (int i = 0; i < MAX_WIFI_PROFILES; i++) used[i] = cfg.wifi[i].used;
   int idx = resolveIdx(argInt("idx", -1), MAX_WIFI_PROFILES, used);
@@ -237,7 +243,7 @@ static void handleWifiDelete() {
   if (!guardPost()) return;
   int idx = argInt("idx", -1);
   char oldSsid[WIFI_SSID_MAX + 1] = "";
-  if (idx >= 0 && idx < MAX_WIFI_PROFILES) strlcpy(oldSsid, configManager.snapshot().wifi[idx].ssid, sizeof(oldSsid));
+  if (idx >= 0 && idx < MAX_WIFI_PROFILES) strlcpy(oldSsid, configManager.heapSnapshot()->wifi[idx].ssid, sizeof(oldSsid));
   if (!configManager.deleteWifi(idx)) return sendError(400, "bad idx");
   reselectIfAffected(oldSsid, oldSsid);
   sendOk();
@@ -245,7 +251,8 @@ static void handleWifiDelete() {
 
 static void handleClaudeSave() {
   if (!guardPost()) return;
-  DeviceConfig cfg = configManager.snapshot();
+  auto cfgHeap = configManager.heapSnapshot();
+  DeviceConfig &cfg = *cfgHeap;
   bool used[MAX_CLAUDE_PROFILES];
   for (int i = 0; i < MAX_CLAUDE_PROFILES; i++) used[i] = cfg.claude[i].used;
   int idx = resolveIdx(argInt("idx", -1), MAX_CLAUDE_PROFILES, used);
@@ -328,7 +335,8 @@ static void handleOAuthStart() {
   if (!guardPost()) return;
   int idx = argInt("idx", -1);
   if (idx < 0 || idx >= MAX_CLAUDE_PROFILES) return sendError(400, "bad idx");
-  DeviceConfig cfg = configManager.snapshot();
+  auto cfgHeap = configManager.heapSnapshot();
+  DeviceConfig &cfg = *cfgHeap;
   if (!cfg.claude[idx].used || cfg.claude[idx].transport != (uint8_t)ClaudeTransport::OAuth)
     return sendError(400, "not an OAuth profile");
   OAuthLogin lg;
@@ -470,13 +478,9 @@ static void handleAdminPassword() {
 static const char *EXPORT_FORMAT = "device-config";
 static const int EXPORT_VERSION = 1;
 
-static void handleExport() {
-  if (!guardRead()) return;
-  bool secrets = server.arg("secrets") == "1";
-  if (secrets && !adminAuth.passwordSet()) return sendError(403, "set an admin password before exporting secrets");
+static void buildExport(bool secrets, JsonDocument &doc) {
   std::unique_ptr<DeviceConfig> cfg(new DeviceConfig);
   configManager.copyTo(*cfg);
-  JsonDocument doc;
   doc["format"] = EXPORT_FORMAT;
   doc["version"] = EXPORT_VERSION;
   doc["firmware"] = FW_VERSION;
@@ -512,7 +516,44 @@ static void handleExport() {
   doc["refreshSec"] = cfg->refreshSec;
   doc["tz"] = cfg->tz;
   Serial.printf("[web] export: %u Wi-Fi, %u Claude, titok=%s\n", (unsigned)wa.size(), (unsigned)ca.size(), secrets ? "igen" : "nem");
+}
+
+// Titok nelkuli, olvashato export.
+static void handleExport() {
+  if (!guardRead()) return;
+  if (server.arg("secrets") == "1") return sendError(400, "secrets are only exported encrypted (POST /api/export-encrypted)");
+  JsonDocument doc;
+  buildExport(false, doc);
   sendJson(200, doc);
+}
+
+// Titkot tartalmazo export, az admin-jelszoval titkositva (projektgazda, 2026-09-17). A jelszot ujra ellenorizzuk
+// (nem eleg a munkamenet-token), es a hibas probalkozas a loginnal kozosen zarol.
+static void handleExportEncrypted() {
+  if (!guardPost()) return;
+  if (!adminAuth.passwordSet()) return sendError(403, "set an admin password before exporting secrets");
+  String pw = server.arg("password");
+  switch (adminAuth.checkPassword(pw)) {
+    case AdminAuth::LoginResult::Ok:
+      break;
+    case AdminAuth::LoginResult::LockedOut:
+      return sendError(429, "too many attempts, wait 60 s");
+    default:
+      return sendError(403, "wrong admin password");  // nem 401: az a munkamenet lejartat jelenti a feluletnek
+  }
+  String plain;
+  {
+    JsonDocument doc;
+    buildExport(true, doc);
+    serializeJson(doc, plain);
+  }
+  JsonDocument env;
+  String err;
+  bool ok = backupEncrypt(plain, pw, env, err);
+  for (size_t i = 0; i < plain.length(); i++) plain.setCharAt(i, 0);  // titok torlese a RAM-bol
+  if (!ok) return sendError(500, err.c_str());
+  env["ok"] = true;  // a felulet post()-ja ezt varja; a letoltott fajlbol a JS kiveszi
+  sendJson(200, env);
 }
 
 static bool tokenString(const char *s) {  // fejlecbe kerul: lathato ASCII, szokoz/;/, nelkul
@@ -527,9 +568,28 @@ static bool tokenString(const char *s) {  // fejlecbe kerul: lathato ASCII, szok
 static void handleImport() {
   if (!guardPost()) return;
   const String &body = server.arg("plain");
-  if (body.isEmpty() || body.length() > 16384) return sendError(400, "empty or too large file");
+  if (body.isEmpty() || body.length() > 32768) return sendError(400, "empty or too large file");
   JsonDocument in;
-  if (deserializeJson(in, body)) return sendError(400, "not a valid JSON file");
+  {
+    JsonDocument outer;
+    if (deserializeJson(outer, body)) return sendError(400, "not a valid JSON file");
+    // Titkositott fajl: a felulet {"backup": <boritek>, "password": "..."} alakban kuldi.
+    JsonVariantConst env = outer["backup"].is<JsonObjectConst>() ? outer["backup"].as<JsonVariantConst>() : outer.as<JsonVariantConst>();
+    if (env["format"] == BACKUP_ENC_FORMAT) {
+      String pw = outer["password"] | "";
+      if (pw.isEmpty()) return sendError(400, "this file is encrypted: enter the admin password it was exported with");
+      String plain, err;
+      if (!backupDecrypt(env, pw, plain, err)) {
+        Serial.printf("[web] import: visszafejtes sikertelen (%s)\n", err.c_str());
+        return sendError(403, err.c_str());
+      }
+      DeserializationError de = deserializeJson(in, plain);
+      for (size_t i = 0; i < plain.length(); i++) plain.setCharAt(i, 0);
+      if (de) return sendError(400, "decrypted content is not valid JSON");
+    } else {
+      in = outer;
+    }
+  }
   if (!(in["format"] == EXPORT_FORMAT) || (in["version"] | 0) != EXPORT_VERSION)
     return sendError(400, "not a settings export of this device (format/version)");
   JsonArrayConst wa = in["wifi"].as<JsonArrayConst>();
@@ -684,6 +744,7 @@ void WebSetup::begin() {
   server.on("/api/login", HTTP_POST, handleLogin);
   server.on("/api/admin", HTTP_POST, handleAdminPassword);
   server.on("/api/export", HTTP_GET, handleExport);
+  server.on("/api/export-encrypted", HTTP_POST, handleExportEncrypted);
   server.on("/api/import", HTTP_POST, handleImport);
   server.onNotFound([] { server.send(404, "text/plain", "not found"); });
   server.begin();

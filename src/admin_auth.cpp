@@ -56,13 +56,24 @@ bool AdminAuth::verify(const String &password) {
   return constTimeEq(h, _hash, sizeof(h));
 }
 
-AdminAuth::LoginResult AdminAuth::login(const String &password, String &tokenOut) {
+AdminAuth::LoginResult AdminAuth::checkPassword(const String &password) {
+  String unused;
+  return login(password, unused, false);
+}
+
+AdminAuth::LoginResult AdminAuth::login(const String &password, String &tokenOut) { return login(password, tokenOut, true); }
+
+AdminAuth::LoginResult AdminAuth::login(const String &password, String &tokenOut, bool issueToken) {
   xSemaphoreTake(_mtx, portMAX_DELAY);
   LoginResult r = LoginResult::Wrong;
   uint32_t now = millis();
   if (_lockUntilMs && (int32_t)(now - _lockUntilMs) < 0) {
     r = LoginResult::LockedOut;
-  } else if (_set && verify(password)) {
+  } else if (_set && verify(password) && !issueToken) {
+    _failures = 0;
+    _lockUntilMs = 0;
+    r = LoginResult::Ok;
+  } else if (_set && issueToken && verify(password)) {
     _failures = 0;
     _lockUntilMs = 0;
     // Uj token: a legregebbi helyet irja felul.

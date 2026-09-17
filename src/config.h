@@ -68,6 +68,9 @@ enum class ClaudeTransport : uint8_t {
 
 // --- Ido (spec 15.) ---
 #define TZ_EUROPE_BUDAPEST "CET-1CEST,M3.5.0,M10.5.0/3"  // alapertelmezes; /usr/share/zoneinfo/Europe/Budapest utolso sora
+// Titkositott mentes kulcsszarmaztatasa (backup_crypto). Offline-tores ellen: annyi kor, amennyi a dongle-on ~1-2 s.
+// Vason mert (2026-09-17): 100000 kor = 9034 ms (~11 000 kor/s) -> 25000 kor ~2,3 s. A fajlba irodik, kesobb emelheto.
+#define BACKUP_KDF_ITERATIONS 25000
 #define TZ_POSIX_MAX 47   // POSIX TZ-string (setup-oldalon allithato, NVS "tz")
 #define NTP_SERVER_1 "pool.ntp.org"
 #define NTP_SERVER_2 "time.google.com"

@@ -90,6 +90,12 @@ DeviceConfig ConfigManager::snapshot() {
   return _cfg;
 }
 
+std::unique_ptr<DeviceConfig> ConfigManager::heapSnapshot() {
+  std::unique_ptr<DeviceConfig> c(new DeviceConfig);
+  copyTo(*c);
+  return c;
+}
+
 void ConfigManager::copyTo(DeviceConfig &out) {
   Lock l(_mtx);
   out = _cfg;

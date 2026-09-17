@@ -31,7 +31,7 @@ void WifiManager::begin(bool forceSetup) {
   char suffix[5];
   snprintf(suffix, sizeof(suffix), "%02X%02X", (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
   _apSsid = String("ClaudeMonitor-") + suffix;
-  _apPassword = configManager.snapshot().apPassword;
+  _apPassword = configManager.heapSnapshot()->apPassword;
   // Diagnosztika: mikor jon tenylegesen a SCAN_DONE esemeny (az Arduino-core 6 s utan FAILED-et ad).
   WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t info) {
     Serial.printf("[wifi] SCAN_DONE esemeny: status %u, %u talalat, t=%lu ms\n", (unsigned)info.wifi_scan_done.status,
@@ -122,7 +122,8 @@ void WifiManager::onScanDone(int n) {
   if (purpose != ScanPurpose::Select) return;
 
   // Spec 8.: engedelyezett profilok, amelyek a scanben latszanak; prioritas csokkeno, azon belul RSSI.
-  DeviceConfig cfg = configManager.snapshot();
+  auto cfgHeap = configManager.heapSnapshot();
+  DeviceConfig &cfg = *cfgHeap;
   for (int i = 0; i < MAX_WIFI_PROFILES; i++) {
     const WifiProfile &w = cfg.wifi[i];
     if (!w.used || !w.enabled || w.ssid[0] == '\0') continue;
@@ -150,7 +151,8 @@ void WifiManager::tryNextCandidate() {
     else _stateSinceMs = millis();  // mar AP-ban: a kovetkezo ujraprobalasig var
     return;
   }
-  DeviceConfig cfg = configManager.snapshot();
+  auto cfgHeap = configManager.heapSnapshot();
+  DeviceConfig &cfg = *cfgHeap;
   const WifiProfile &w = cfg.wifi[_candidates[_candIdx].profileIdx];
   // Csak az SSID es a profil-index kerul logba, a jelszo soha.
   Serial.printf("[wifi] csatlakozas: profil %d, SSID '%s'\n", _candidates[_candIdx].profileIdx, w.ssid);

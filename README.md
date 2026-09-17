@@ -327,21 +327,28 @@ Elfelejtett admin-jelszó: forced setup (7.), abban a módban nem kell jelszó.
 
 A setup-oldal **Backup (export / import)** részén.
 
-- **Export settings** → `device-config-ÉÉÉÉ-HH-NN.json`: Wi-Fi- és Claude-profilok, rotáció, frissítés, időzóna.
-  - Alapból **titok nélkül**: nincs benne Wi-Fi-jelszó és Claude-token.
-  - *include secrets* bepipálva → `…-SECRETS.json`, benne a jelszavak és a tokenek. Csak akkor engedi, ha van
-    admin-jelszó; a fájlt jelszóként kell kezelni. Egy visszatöltött Claude-token közben lejárhatott vagy rotálódhatott →
-    ilyenkor *Authenticate*.
-- **Import settings**: **minden** Wi-Fi- és Claude-profilt, a megjelenítést és az időzónát lecseréli (megerősítést kér).
-  - Az AP-jelszó és az admin-jelszó marad.
-  - Ahol a fájlban nincs titok, a **meglévő marad**: Wi-Fi azonos SSID-vel, Claude azonos névvel és forrással.
-    Egy titok nélküli export visszatöltése tehát nem jelentkeztet ki.
-  - Hibás fájlnál (formátum, hossz, UUID, TZ) semmi nem változik.
-- Mérve (2026-09-17, Playwright, `test/e2e/backup.test.js`, 10/10):
-  - a titok nélküli exportban nincs `password`/`auth`/`refresh` kulcs;
-  - a secrets-exportban megvannak (xiTech: auth 108, refresh 108 karakter — csak hossz);
-  - token nélkül `401`, rossz formátum → hiba;
-  - a titok nélküli export visszatöltése után a konfiguráció azonos, a jelszavak és a tokenek megmaradtak, a lekérés `HTTP 200`.
+- **Export settings**, *include secrets* nélkül → `device-config-ÉÉÉÉ-HH-NN.json`: olvasható JSON, titok nélkül.
+  Tartalma: Wi-Fi- és Claude-profilok (jelszó/token nélkül), rotáció, frissítés, időzóna.
+- **Export settings**, *include secrets*-szel → `…-ENCRYPTED.json`, a Wi-Fi-jelszavakkal és a Claude-tokenekkel.
+  - A felület bekéri a mostani admin-jelszót, a dongle **újra ellenőrzi** (a hibás próbálkozás a loginnal közösen zárol).
+  - A fájlt a dongle titkosítja: PBKDF2-HMAC-SHA256 (16 bájt só, 25 000 kör) → AES-256-GCM (12 bájt IV, 16 bájt tag,
+    AAD = `device-config-encrypted/1`), `src/backup_crypto.*`.
+  - A fájlban semmi olvasható nincs: se SSID, se profilnév.
+  - A böngészőben ez nem mehet, mert a WebCrypto API sima HTTP-n (nem *secure context*) nem érhető el.
+  - Olvasható titok-export nincs: `GET /api/export?secrets=1` → `400`.
+- **Import settings**: minden Wi-Fi- és Claude-profilt, a megjelenítést és az időzónát lecseréli (megerősítést kér).
+  - **Titkosított fájlnál** bekéri az exportkor érvényes admin-jelszót. Ez független a mostanitól, tehát másik dongle-on
+    vagy jelszócsere után is működik. Rossz jelszónál a GCM-ellenőrzés miatt biztosan hibát ad, és semmi nem változik.
+  - Titok nélküli fájlnál a dongle-on **meglévő** jelszó és token marad (azonos SSID, illetve azonos Claude-név + forrás).
+  - Az AP-jelszó és az admin-jelszó marad. Egy visszatöltött Claude-token közben lejárhatott vagy rotálódhatott → *Authenticate*.
+- **Dongle nélkül:** [`tools/decrypt_backup.py`](tools/decrypt_backup.py) (`pip install cryptography`); `--summary` csak neveket és hosszakat ír.
+- ⚠ A jelszó exportkor és importkor is sima HTTP-n megy a helyi hálón (mint a loginnál); a fájl maga védett.
+- Mérve (2026-09-17):
+  - PBKDF2 100 000 kör = **9034 ms** (túl lassú) → 25 000 kör = **2258 ms**;
+  - `test/e2e/backup.test.js` **18/18**: olvasható export titok nélkül; titok olvasható formában nem kérhető; jelszó nélkül és
+    rossz jelszóval elutasítva; titkosított fájlban nincs olvasható SSID/név; **független Python-visszafejtés** (jó jelszóval OK,
+    rosszal `InvalidTag`); import rossz jelszóval hiba és változatlan konfig; import jó jelszóval és titok nélkül is azonos konfig
+    (a tokenek megmaradtak), a lekérés `HTTP 200`.
 
 **Felület-teszt:** `test/e2e/setup_ui.test.js` (25/25). Login-héj, rossz és jó jelszó, Claude-profil mentés/átnevezés/
 *Authenticate* (új fül az authorize URL-lel), `Profile-XX`, ékezetes név elutasítva, Wi-Fi-profil mentés/törlés
