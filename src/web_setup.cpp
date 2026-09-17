@@ -220,8 +220,13 @@ static void handleClaudeSave() {
 
   String name = server.arg("name");
   name.trim();
-  if (name.isEmpty() || name.length() > CLAUDE_NAME_MAX || !printableAscii(name, true))
-    return sendError(400, "name: 1-12 ASCII chars");
+  if (name.isEmpty()) {  // projektgazda (2026-09-17): ures nev -> automatikus "Profile-XX" (a slot sorszama, 01..)
+    char auto_name[CLAUDE_NAME_MAX + 1];
+    snprintf(auto_name, sizeof(auto_name), "Profile-%02d", idx + 1);
+    name = auto_name;
+  }
+  if (name.length() > CLAUDE_NAME_MAX || !printableAscii(name, true))
+    return sendError(400, "name: max 12 ASCII chars (empty = Profile-XX)");
   String tr = server.arg("transport");
   int transport = -1;
   for (int t = 0; t < CLAUDE_TRANSPORT_COUNT; t++)

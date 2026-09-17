@@ -53,7 +53,7 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
 <form id="claudeForm" onsubmit="return saveClaude(event)">
   <input type="hidden" name="idx" value="-1">
   <b id="claudeFormTitle">Add Claude profile</b>
-  <label>Name (max 12)</label><input type="text" name="name" maxlength="12" required>
+  <label>Name (max 12, empty = Profile-XX)</label><input type="text" name="name" maxlength="12" placeholder="Profile-XX">
   <label>Source</label><select name="transport" onchange="onTransport()">
     <option value="oauth">api.anthropic.com (OAuth, recommended)</option>
     <option value="web-session">claude.ai web (sessionKey cookie)</option>
@@ -180,7 +180,6 @@ function startLogin(idx,w){loginIdx=idx;return post('/api/oauth/start',{idx}).th
   if(w&&!w.closed){w.location.href=j.authorizeUrl;say('Claude sign-in opened in a new tab. Approve, copy the code, paste it below.')}
   else say('Tap "Open Claude sign-in page", approve, then paste the code below.');}).catch(e=>{if(w&&!w.closed)w.close();throw e});}
 function authNow(){const f=$('claudeForm');const d=formData(f);if(!d.enabled)d.enabled='0';delete d.auth;delete d.orgId;d.transport='oauth';
-  if(!d.name||!d.name.trim()){say('Enter a name first');f.elements['name'].focus();return}
   const w=window.open('about:blank','_blank');
   post('/api/claude',d).then(j=>{f.idx.value=j.idx;$('claudeFormTitle').textContent='Edit Claude profile';load();return startLogin(j.idx,w)})
     .catch(e=>{if(w&&!w.closed)w.close();say(e.message)})}
