@@ -59,6 +59,7 @@ class WifiManager {
   std::vector<Candidate> _candidates;
   size_t _candIdx = 0;
   uint32_t _stateSinceMs = 0;
+  uint32_t _scanStartMs = 0;  // diagnosztika: a scan idotartama a naplohoz
   uint32_t _lostSinceMs = 0;
   String _connectedSsid;
   String _apSsid, _apPassword;

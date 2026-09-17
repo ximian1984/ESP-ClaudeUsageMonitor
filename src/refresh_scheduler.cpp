@@ -14,8 +14,9 @@
 RefreshScheduler refreshScheduler;
 
 // ⚠ [vason merendo] a TLS-kezfogas stackigenye; a token-frissites es a usage-lekeres kulon TLS-kapcsolat.
-// 12 KB ovatos kezdoertek.
-static const uint32_t TASK_STACK = 12288;
+// 16 KB: a run() DeviceConfig-masolatot (~4,7 KB) tart a stacken a TLS-hivasok alatt (a loopTask 8 KB-ja emiatt
+// tulcsordult, PLAN 2.11). A tenyleges maradekot a fetch utani naplo mutatja (stack HWM).
+static const uint32_t TASK_STACK = 16384;
 static const uint32_t PARSER_PENDING_RETRY_MS = 300000UL;
 
 void RefreshScheduler::begin() {
@@ -157,6 +158,8 @@ void RefreshScheduler::run() {
           }
         }
         err = resp.error;
+        Serial.printf("[sched] stack HWM %u B, heap szabad %u B (min %u B)\n", (unsigned)uxTaskGetStackHighWaterMark(nullptr),
+                      (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap());
       }
     }
 

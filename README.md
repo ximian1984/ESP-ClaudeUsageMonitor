@@ -168,7 +168,7 @@ A konfiguráció NVS-ben van, újraindítás és firmware-frissítés után is m
 
 ## 8. Több Wi-Fi profil
 
-Legfeljebb **5** profil: SSID, jelszó, engedélyezve, prioritás (-1000…1000, a nagyobb az előnyösebb).
+Legfeljebb **20** profil (hordozható eszköz, sok helyszín): SSID, jelszó, engedélyezve, prioritás (-1000…1000, a nagyobb az előnyösebb).
 A setup-oldalon felvehető, szerkeszthető, törölhető, tiltható, a **Scan** gombbal pedig a látható
 hálózatok közül választható SSID.
 

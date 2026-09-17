@@ -23,6 +23,11 @@ void WifiManager::begin(bool forceSetup) {
   snprintf(suffix, sizeof(suffix), "%02X%02X", (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
   _apSsid = String("ClaudeMonitor-") + suffix;
   _apPassword = configManager.snapshot().apPassword;
+  // Diagnosztika: mikor jon tenylegesen a SCAN_DONE esemeny (az Arduino-core 6 s utan FAILED-et ad).
+  WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t info) {
+    Serial.printf("[wifi] SCAN_DONE esemeny: status %u, %u talalat, t=%lu ms\n", (unsigned)info.wifi_scan_done.status,
+                  (unsigned)info.wifi_scan_done.number, (unsigned long)millis());
+  }, ARDUINO_EVENT_WIFI_SCAN_DONE);
 
   if (forceSetup) {
     startAp(true);
@@ -58,7 +63,10 @@ void WifiManager::startSelect() {
   _candidates.clear();
   _candIdx = 0;
   WiFi.scanDelete();
-  if (WiFi.scanNetworks(true) == WIFI_SCAN_FAILED) {
+  _scanStartMs = millis();
+  int16_t sr = WiFi.scanNetworks(true);
+  Serial.printf("[wifi] select-scan inditas: %d, mode %d, t=%lu ms\n", sr, (int)WiFi.getMode(), (unsigned long)_scanStartMs);
+  if (sr == WIFI_SCAN_FAILED) {
     _scanPurpose = ScanPurpose::None;
     Serial.println("[wifi] scan inditas sikertelen");
     if (!apActive()) startAp(false);
@@ -68,6 +76,9 @@ void WifiManager::startSelect() {
 }
 
 void WifiManager::onScanDone(int n) {
+  Serial.printf("[wifi] scan kesz: %d talalat, %lu ms, cel %s, loopTask stack HWM %u B\n", n,
+                (unsigned long)(millis() - _scanStartMs), _scanPurpose == ScanPurpose::Web ? "web" : "select",
+                (unsigned)uxTaskGetStackHighWaterMark(nullptr));
   // Web-listahoz: SSID-enkent a legerosebb, legfeljebb MAX_SCAN_ENTRIES.
   std::vector<ScanEntry> entries;
   for (int i = 0; i < n; i++) {
@@ -155,7 +166,14 @@ void WifiManager::loop() {
     int n = WiFi.scanComplete();
     if (n >= 0) {
       onScanDone(n);
+    } else if (n == WIFI_SCAN_FAILED && millis() - _scanStartMs < WIFI_SCAN_TIMEOUT_MS) {
+      // Az Arduino-core (2.0.17) sajat idokorlatja max_ms_per_chan*20 = 6 s (WiFiScan.cpp:63,144), utana -2-t ad,
+      // pedig a scan fut tovabb. Vason mert: 6,76 s, 21 talalat (PLAN 2.11). A kesz esemeny utan a core ujra a
+      // talalatszamot adja (_scanDone nullazza a _scanStarted-et), ezert a -2-t a sajat korlatunkig "fut"-nak vesszuk.
     } else if (n == WIFI_SCAN_FAILED) {
+      Serial.printf("[wifi] scan HIBA, %lu ms, cel %s\n", (unsigned long)(millis() - _scanStartMs),
+                    _scanPurpose == ScanPurpose::Web ? "web" : "select");
+      WiFi.scanDelete();
       _scanPurpose = ScanPurpose::None;
       if (_state == WifiState::Scanning) startAp(false);
     }
@@ -166,7 +184,10 @@ void WifiManager::loop() {
   if (webScanPending && (_state == WifiState::Connected || apActive())) {
     webScanPending = false;
     WiFi.scanDelete();
-    if (WiFi.scanNetworks(true) != WIFI_SCAN_FAILED) _scanPurpose = ScanPurpose::Web;
+    _scanStartMs = millis();
+    int16_t sr = WiFi.scanNetworks(true);
+    Serial.printf("[wifi] web-scan inditas: %d, mode %d\n", sr, (int)WiFi.getMode());
+    if (sr != WIFI_SCAN_FAILED) _scanPurpose = ScanPurpose::Web;
     return;
   }
 

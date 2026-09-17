@@ -11,7 +11,7 @@
 #define PIN_BOOT_BTN 0    // docs Pins Map "Button 0"
 
 // --- Korlatok ---
-#define MAX_WIFI_PROFILES   5
+#define MAX_WIFI_PROFILES   20  // projektgazda (2026-09-17): hordozhato eszkoz, sok helyszin. Kulcsok "w19ssid" <= 15 kar.
 #define MAX_CLAUDE_PROFILES 5
 #define WIFI_SSID_MAX   32   // 802.11
 #define WIFI_PASS_MAX   64   // WPA2-PSK
@@ -27,6 +27,7 @@
 
 // --- Wi-Fi ---
 #define WIFI_CONNECT_TIMEOUT_MS  15000
+#define WIFI_SCAN_TIMEOUT_MS     20000   // sajat scan-korlat; a core 6 s-a keves (vason mert scan: 6,76 s)
 #define WIFI_RETRY_FROM_AP_MS    300000  // fallback AP-bol 5 percenkent ujraprobal, ha nincs AP-kliens
 #define BOOT_WINDOW_MS           3000    // ennyi ideig figyeli a BOOT gombot inditas utan (ld. main.cpp)
 #define BOOT_LONGPRESS_MS        5000    // futas kozben hosszan nyomva -> setup AP

@@ -148,7 +148,7 @@ function pollScan(){fetch('/api/scan').then(r=>r.json()).then(s=>{
   if(s.running){setTimeout(pollScan,1000);return}
   const sel=$('scanSel');sel.textContent='';const o0=document.createElement('option');o0.value='';o0.textContent='- '+s.results.length+' networks -';sel.appendChild(o0);
   for(const n of s.results){const o=document.createElement('option');o.value=n.ssid;o.textContent=n.ssid+' ('+n.rssi+' dBm'+(n.secure?'':', open')+')';sel.appendChild(o)}
-  say('Scan done');})}
+  say('Scan done: '+s.results.length+' networks');}).catch(e=>{say('Scan: connection lost, retrying...');setTimeout(pollScan,1500)})}
 function pickScan(){const v=$('scanSel').value;if(v)$('wifiForm').ssid.value=v}
 
 function renderClaude(st){

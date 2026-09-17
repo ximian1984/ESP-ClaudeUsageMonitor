@@ -12,6 +12,11 @@
 #include "web_setup.h"
 #include "wifi_manager.h"
 
+// loopTask stack: az alap 8 KB (core main.cpp:14) KEVES. A configManager.snapshot() egy DeviceConfig-masolat
+// (~4,7 KB: 5 Claude-profil x access+refresh+scope) a stacken; a scan utani tryNextCandidate-ben ez
+// "Stack canary watchpoint triggered (loopTask)" boot-loopot okozott (vason mert, 2026-09-17, PLAN 2.11).
+SET_LOOP_TASK_STACK_SIZE(16 * 1024);
+
 // Forced setup (spec 10.). ⚠ A LilyGO doksi szerint a BOOT gombot a TAP BEDUGASAKOR nyomva tartva
 // az ESP32-S3 letoltesi modba lep, es a firmware el sem indul (docs/en/t-dongle-s3/REAMDE.MD,
 // "Do not press the BOOT button while powering on"). Ezert a gombot INDULAS UTAN, a kijelzon

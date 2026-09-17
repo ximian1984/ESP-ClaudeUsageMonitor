@@ -2,6 +2,7 @@
 
 #include <Preferences.h>
 #include <esp_random.h>
+#include <nvs.h>
 
 // NVS: namespace "cmon", kulcsok <=15 karakter (NVS-korlat).
 // A semaversio a jovobeli migraciohoz kell; firmware-frissites az NVS-t nem torli (spec 22.).
@@ -75,7 +76,12 @@ void ConfigManager::load() {
     p.putString("appass", _cfg.apPassword);
   }
   p.end();
-  // Szandekosan nincs Serial-log a tartalomrol (spec 19.).
+  // Szandekosan nincs Serial-log a tartalomrol (spec 19.). Csak az NVS-foglaltsag (20 Wi-Fi-profil + 5 Claude-profil
+  // tokenekkel: a 0x5000-es nvs particio merete a korlat, ld. PLAN 2.11).
+  nvs_stats_t st;
+  if (nvs_get_stats(nullptr, &st) == ESP_OK)
+    Serial.printf("[config] NVS bejegyzes: %u foglalt, %u szabad, %u osszes\n", (unsigned)st.used_entries,
+                  (unsigned)st.free_entries, (unsigned)st.total_entries);
 }
 
 DeviceConfig ConfigManager::snapshot() {
