@@ -156,6 +156,19 @@ static void handleConfig() {
   sendJson(200, doc);
 }
 
+// Ujravalasztas csak akkor, ha a mentes/torles a MOSTANI kapcsolatot erinti (vagy nincs kapcsolat). Kulonben a
+// scan + WiFi.disconnect() ~20 s-ra bontana a jo kapcsolatot, es a setup-oldal frissitese elveszne (vason mert,
+// 2026-09-17). Korlat: egy ujonnan felvett, nagyobb prioritasu halozatra csak a kovetkezo kapcsolatvesztesnel valt.
+static void reselectIfAffected(const char *oldSsid, const char *newSsid) {
+  WifiState st = wifiManager.state();
+  if (st == WifiState::ApForced) return;
+  if (st == WifiState::Connected) {
+    String cur = wifiManager.staSsid();
+    if (cur != oldSsid && cur != newSsid) return;
+  }
+  wifiManager.requestReselect();
+}
+
 static void handleWifiSave() {
   if (!guardPost()) return;
   DeviceConfig cfg = configManager.snapshot();
@@ -170,6 +183,8 @@ static void handleWifiSave() {
 
   WifiProfile p = cfg.wifi[idx];
   const bool existing = p.used;
+  char oldSsid[WIFI_SSID_MAX + 1];
+  strlcpy(oldSsid, existing ? p.ssid : "", sizeof(oldSsid));
   if (!existing || argBool("changePassword")) {
     String pass = server.arg("password");
     // WPA2-PSK: 8-63 ASCII vagy 64 hex; ures = nyilt halozat
@@ -180,14 +195,17 @@ static void handleWifiSave() {
   p.enabled = argBool("enabled");
   p.priority = (int16_t)constrain(argInt("priority", 0), -1000, 1000);
   if (!configManager.saveWifi(idx, p)) return sendError(500, "save failed");
-  if (wifiManager.state() != WifiState::ApForced) wifiManager.requestReselect();
+  reselectIfAffected(oldSsid, p.ssid);
   sendOk();
 }
 
 static void handleWifiDelete() {
   if (!guardPost()) return;
-  if (!configManager.deleteWifi(argInt("idx", -1))) return sendError(400, "bad idx");
-  if (wifiManager.state() != WifiState::ApForced) wifiManager.requestReselect();
+  int idx = argInt("idx", -1);
+  char oldSsid[WIFI_SSID_MAX + 1] = "";
+  if (idx >= 0 && idx < MAX_WIFI_PROFILES) strlcpy(oldSsid, configManager.snapshot().wifi[idx].ssid, sizeof(oldSsid));
+  if (!configManager.deleteWifi(idx)) return sendError(400, "bad idx");
+  reselectIfAffected(oldSsid, oldSsid);
   sendOk();
 }
 

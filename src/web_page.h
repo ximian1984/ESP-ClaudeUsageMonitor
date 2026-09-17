@@ -124,7 +124,7 @@ function loadStatus(){fetch('/api/status').then(r=>r.json()).then(s=>{
   if(cfg)renderClaude(s.claude);
 }).catch(()=>{})}
 
-function load(){fetch('/api/config').then(r=>r.json()).then(c=>{cfg=c;$('rot').value=c.rotationSec;$('refr').value=c.refreshSec;renderWifi();onTransport();loadStatus()})}
+function load(tries){tries=tries||0;fetch('/api/config').then(r=>r.json()).then(c=>{cfg=c;$('rot').value=c.rotationSec;$('refr').value=c.refreshSec;renderWifi();onTransport();loadStatus()}).catch(()=>{if(tries<15){say('Device busy (Wi-Fi reconnect?), retrying...');setTimeout(()=>load(tries+1),2000)}else say('Device not reachable - reload the page')})}
 
 function renderWifi(){
   const tb=$('wifiList');tb.textContent='';
