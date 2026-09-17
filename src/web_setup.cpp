@@ -2,6 +2,7 @@
 
 #include <ArduinoJson.h>
 #include <WebServer.h>
+#include <esp_random.h>
 
 #include "admin_auth.h"
 #include "claude_client.h"
@@ -220,9 +221,15 @@ static void handleClaudeSave() {
 
   String name = server.arg("name");
   name.trim();
-  if (name.isEmpty()) {  // projektgazda (2026-09-17): ures nev -> automatikus "Profile-XX" (a slot sorszama, 01..)
+  if (name.isEmpty()) {  // projektgazda (2026-09-17): ures nev -> "Profile-XX", XX VELETLEN 00-99, masik profillal nem utkozik
     char auto_name[CLAUDE_NAME_MAX + 1];
-    snprintf(auto_name, sizeof(auto_name), "Profile-%02d", idx + 1);
+    for (int tries = 0; tries < 50; tries++) {
+      snprintf(auto_name, sizeof(auto_name), "Profile-%02u", (unsigned)(esp_random() % 100));
+      bool clash = false;
+      for (int i = 0; i < MAX_CLAUDE_PROFILES; i++)
+        if (i != idx && cfg.claude[i].used && strcmp(cfg.claude[i].name, auto_name) == 0) clash = true;
+      if (!clash) break;
+    }
     name = auto_name;
   }
   if (name.length() > CLAUDE_NAME_MAX || !printableAscii(name, true))
