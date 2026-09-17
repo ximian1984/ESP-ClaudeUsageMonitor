@@ -67,20 +67,20 @@ String TimeManager::resetText(time_t resetAt, bool synced, time_t now) {
   localtime_r(&t, &lt);
   char when[16];
   strftime(when, sizeof(when), "%m.%d %H:%M", &lt);  // HH.NN oo:pp — az ev nem fer ki, es nem is kell
-  if (!synced) return String("RESET @") + when + " ?";  // pontos ido nelkul nincs visszaszamlalas
+  // 160 px / 6 px = 26 karakter. "IN 3d04:12:33 @09.24 09:00" = 26 — a leghosszabb eset is kifer.
+  if (!synced) return String("AT ") + when + " (no clock)";  // pontos ido nelkul nincs visszaszamlalas
   long secs = (long)(resetAt - now);
-  if (secs <= 0) return String("RESET PASSED ") + when;
-  return "RESET " + formatRemaining(secs) + " @" + when;
+  if (secs <= 0) return String("PASSED @") + when;
+  return "IN " + formatRemaining(secs) + " @" + when;
 }
 
 String TimeManager::formatRemaining(long s) {
   if (s <= 0) return "--";
   char buf[16];
   long d = s / 86400, h = (s % 86400) / 3600, m = (s % 3600) / 60, sec = s % 60;
-  // Rovid alak, hogy mellette MINDIG elferjen a "@HH.NN oo:pp" datum a 160 px-es sorban (projektgazda, 2026-09-17).
-  if (d > 0) snprintf(buf, sizeof(buf), "%ldd%02ldh", d, h);
-  else if (h > 0) snprintf(buf, sizeof(buf), "%ldh%02ldm", h, m);
-  else snprintf(buf, sizeof(buf), "%ldm%02lds", m, sec);
+  // Masodpercre jar, hogy lathatoan menjen (a perces "16h58m" allonak tunt — projektgazda, 2026-09-17).
+  if (d > 0) snprintf(buf, sizeof(buf), "%ldd%02ld:%02ld:%02ld", d, h, m, sec);
+  else snprintf(buf, sizeof(buf), "%02ld:%02ld:%02ld", h, m, sec);
   return buf;
 }
 
