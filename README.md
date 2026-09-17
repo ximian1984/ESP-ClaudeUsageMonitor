@@ -115,6 +115,28 @@ csatlakoztatása után történik, az `⚠ [vason mérendő]`.
    előtt kiírt sor elveszhetett (USB-CDC újracsatlakozik). Ilyenkor húzd ki és dugd vissza, a monitor fusson közben.
 8. Kijelző: 3 s-ig `Press BOOT now for setup mode`, utána AP-képernyő (6. szakasz).
 
+### 5/b. Feltöltés PlatformIO nélkül (host)
+
+Ha a dongle olyan Machez van dugva, amin nincs PlatformIO, akkor ott csak az `esptool` kell. A fordítás máshol történik.
+[`tools/flash.sh`](tools/flash.sh) ugyanazokat a paramétereket adja, mint a `pio run -t upload`
+(`envdump` `UPLOADERFLAGS`; a `qio`-ból feltöltéskor `dio` lesz, `platform main.py` `_get_board_flash_mode`).
+
+Mérve (2026-09-17, host, macOS 26.6.2, `/usr/bin/python3` 3.9.6, nincs brew/pio):
+`~/cmon-flash/` = `venv` (`pip install esptool==4.9.0`) + a 4 bináris + `SHA256SUMS` + `flash.sh`. A script port nélkül
+kilistázza a soros portokat. A dongle nélküli listában nincs `usbmodem`.
+
+```sh
+ssh host                        # vagy helyben a host-n
+cd ~/cmon-flash
+sh flash.sh                          # portlista bedugás ELŐTT
+# dongle be →
+sh flash.sh                          # az új /dev/cu.usbmodem… a dongle
+sh flash.sh /dev/cu.usbmodemXXXX     # SHA256-ellenőrzés, majd írás
+```
+
+Letöltési mód, ha nem kapcsolódik: lásd az 5. szakasz 5–6. lépését. Új build után a 4 binárist és a
+`SHA256SUMS`-t újra át kell másolni.
+
 Opcionális, ha a gyári firmware maradéka zavar: `pio run -t erase --upload-port …`. Ez **törli az NVS-t is**
 (Wi-Fi/Claude-profilok, AP-jelszó).
 
