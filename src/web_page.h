@@ -15,7 +15,9 @@ input[type=text],input[type=password],input[type=number]{width:100%}
 button{cursor:pointer}button.danger{border-color:#a33}
 form{background:#1b1b1b;padding:8px;border-radius:6px;margin-top:8px}
 label{display:block;margin-top:6px;font-size:.85em;color:#aaa}
-.msg{min-height:1.2em;color:#fc6}.muted{color:#888;font-size:.85em}
+.msg{min-height:1.2em;color:#fc6;position:sticky;top:0;background:#111;z-index:5;padding:4px 0}.muted{color:#888;font-size:.85em}
+.tw{overflow-x:auto}
+button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;background:#1f5f3a;border:1px solid #3c9;color:#fff;font-weight:bold;text-align:center;text-decoration:none;border-radius:4px;box-sizing:border-box}
 </style></head><body>
 <h1>Claude Usage Monitor</h1>
 <div class="msg" id="msg"></div>
@@ -33,7 +35,7 @@ label{display:block;margin-top:6px;font-size:.85em;color:#aaa}
 <button onclick="post('/api/restart',{}).then(()=>say('Restarting...'))">Restart</button>
 
 <h2>Wi-Fi profiles</h2>
-<table><thead><tr><th>SSID</th><th>Priority</th><th>Enabled</th><th>Password</th><th></th></tr></thead><tbody id="wifiList"></tbody></table>
+<div class="tw"><table><thead><tr><th>SSID</th><th>Priority</th><th>Enabled</th><th>Password</th><th></th></tr></thead><tbody id="wifiList"></tbody></table></div>
 <form id="wifiForm" onsubmit="return saveWifi(event)">
   <input type="hidden" name="idx" value="-1">
   <b id="wifiFormTitle">Add Wi-Fi profile</b>
@@ -47,7 +49,7 @@ label{display:block;margin-top:6px;font-size:.85em;color:#aaa}
 </form>
 
 <h2>Claude profiles</h2>
-<table><thead><tr><th>Name</th><th>Source</th><th>Organization ID</th><th>Enabled</th><th>Auth</th><th>Last update</th><th></th></tr></thead><tbody id="claudeList"></tbody></table>
+<div class="tw"><table><thead><tr><th>Name</th><th>Source</th><th>Organization ID</th><th>Enabled</th><th>Auth</th><th>Last update</th><th></th></tr></thead><tbody id="claudeList"></tbody></table></div>
 <form id="claudeForm" onsubmit="return saveClaude(event)">
   <input type="hidden" name="idx" value="-1">
   <b id="claudeFormTitle">Add Claude profile</b>
@@ -61,16 +63,19 @@ label{display:block;margin-top:6px;font-size:.85em;color:#aaa}
     <div class="muted">The stored value is never shown again. When editing, leave empty to keep it.</div></div>
   <label><input type="checkbox" name="enabled" value="1" checked> enabled</label>
   <button type="submit">Save</button> <button type="button" onclick="resetClaudeForm()">New</button>
-  <div id="oauthRow" class="muted">OAuth profiles: save first, then use "Login" in the list below to sign in on your phone.</div>
+  <div id="oauthRow">
+    <button type="button" class="primary" onclick="authNow()">Authenticate now</button>
+    <div class="muted">Saves this profile and opens the Claude sign-in page in a new tab. Approve there, copy the code, paste it below.</div>
+  </div>
 </form>
 
 <div id="loginFlow" style="display:none;background:#1b1b1b;padding:8px;border-radius:6px;margin-top:8px">
   <b>OAuth login</b>
-  <div class="muted">1. Open this URL on a device where you are signed in to Claude:</div>
-  <div style="word-break:break-all;margin:6px 0"><a id="authUrl" href="#" target="_blank" rel="noopener"></a></div>
+  <div class="muted">1. Sign in to Claude and approve (if the tab did not open, use this button):</div>
+  <a id="authUrl" class="primary" href="#" target="_blank" rel="noopener">Open Claude sign-in page</a>
   <div class="muted">2. After approving, the page shows a code. Paste it here (format <code>code#state</code>):</div>
   <input type="text" id="oauthCode" placeholder="code#state" autocomplete="off">
-  <button type="button" onclick="finishLogin()">Submit code</button>
+  <button type="button" class="primary" onclick="finishLogin()">Submit code</button>
   <button type="button" onclick="$('loginFlow').style.display='none'">Cancel</button>
 </div>
 
@@ -160,7 +165,7 @@ function renderClaude(st){
     cell(tr,s?(s.hasData?s.lastOkAgoS+' s ago':'-')+(s.lastError?' / '+s.lastError+(s.httpStatus?' '+s.httpStatus:''):''):'-');
     const td=cell(tr,'');
     btn(td,'Edit',()=>editClaude(c));
-    if(c.transport==='oauth')btn(td,'Login',()=>startLogin(c.idx));
+    if(c.transport==='oauth')btn(td,'Authenticate',()=>{const w=window.open('about:blank','_blank');startLogin(c.idx,w).catch(e=>say(e.message))});
     btn(td,c.enabled?'Disable':'Enable',()=>post('/api/claude',{idx:c.idx,name:c.name,transport:c.transport,orgId:c.orgId,enabled:c.enabled?'0':'1'}).then(load).catch(e=>say(e.message)));
     btn(td,'Delete',()=>{if(confirm('Delete '+c.name+'?'))post('/api/claude/delete',{idx:c.idx}).then(load).catch(e=>say(e.message))},'danger');
     tb.appendChild(tr)}
@@ -169,7 +174,16 @@ function editClaude(c){const f=$('claudeForm');f.idx.value=c.idx;f.elements['nam
   onTransport();$('claudeFormTitle').textContent='Edit Claude profile';}
 function onTransport(){const oauth=$('claudeForm').transport.value==='oauth';$('orgRow').style.display=oauth?'none':'block';$('authRow').style.display=oauth?'none':'block';$('oauthRow').style.display=oauth?'block':'none';}
 let loginIdx=-1;
-function startLogin(idx){loginIdx=idx;post('/api/oauth/start',{idx}).then(j=>{$('authUrl').textContent=j.authorizeUrl;$('authUrl').href=j.authorizeUrl;$('oauthCode').value='';$('loginFlow').style.display='block';say('Open the URL, approve, then paste the code');}).catch(e=>say(e.message));}
+// A bongeszo csak kattintasra enged uj fulet: a hivo a kattintaskor nyit egy ures fulet (w), ide kerul az URL.
+function startLogin(idx,w){loginIdx=idx;return post('/api/oauth/start',{idx}).then(j=>{$('authUrl').href=j.authorizeUrl;$('oauthCode').value='';
+  $('loginFlow').style.display='block';$('loginFlow').scrollIntoView({behavior:'smooth'});
+  if(w&&!w.closed){w.location.href=j.authorizeUrl;say('Claude sign-in opened in a new tab. Approve, copy the code, paste it below.')}
+  else say('Tap "Open Claude sign-in page", approve, then paste the code below.');}).catch(e=>{if(w&&!w.closed)w.close();throw e});}
+function authNow(){const f=$('claudeForm');const d=formData(f);if(!d.enabled)d.enabled='0';delete d.auth;delete d.orgId;d.transport='oauth';
+  if(!d.name||!d.name.trim()){say('Enter a name first');f.elements['name'].focus();return}
+  const w=window.open('about:blank','_blank');
+  post('/api/claude',d).then(j=>{f.idx.value=j.idx;$('claudeFormTitle').textContent='Edit Claude profile';load();return startLogin(j.idx,w)})
+    .catch(e=>{if(w&&!w.closed)w.close();say(e.message)})}
 function finishLogin(){post('/api/oauth/finish',{idx:loginIdx,code:$('oauthCode').value}).then(()=>{$('loginFlow').style.display='none';$('oauthCode').value='';say('Logged in');load();}).catch(e=>say(e.message));}
 function resetClaudeForm(){const f=$('claudeForm');f.reset();f.idx.value=-1;onTransport();$('claudeFormTitle').textContent='Add Claude profile'}
 function saveClaude(ev){ev.preventDefault();const f=ev.target;const d=formData(f);if(!d.enabled)d.enabled='0';if(d.transport==='oauth'){delete d.auth;delete d.orgId}else if(d.auth)d.changeAuth='1';

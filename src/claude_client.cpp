@@ -67,6 +67,7 @@ static void authOAuth(HTTPClient &http, const char *auth) {
 }
 
 struct TransportSpec {
+  ClaudeTransport id;  // kifejezett azonosito: a tomb sorrendje NEM szamit (lasd spec())
   const char *name;
   const char *host;
   const char *pathPrefix;  // WebSession: + orgId + pathSuffix; OAuth: teljes path
@@ -76,13 +77,17 @@ struct TransportSpec {
 };
 
 static const TransportSpec kTransports[CLAUDE_TRANSPORT_COUNT] = {
-    {"web-session", "claude.ai", "/api/organizations/", "/usage", true, authWebSession},
-    {"oauth", "api.anthropic.com", "/api/oauth/usage", "", false, authOAuth},
+    {ClaudeTransport::OAuth, "oauth", "api.anthropic.com", "/api/oauth/usage", "", false, authOAuth},
+    {ClaudeTransport::WebSession, "web-session", "claude.ai", "/api/organizations/", "/usage", true, authWebSession},
 };
 
+// Azonosito szerinti kereses. Vason mert hiba (2026-09-17): a tomb korabban indexelve volt, de a sorrendje
+// (web-session, oauth) nem egyezett az enummal (OAuth = 0) -> az "oauth" forras WebSession-nek szamitott,
+// es a mentes "sessionKey value required"-del elbukott (OAuth-profil a claude.ai-t hivta volna).
 static const TransportSpec *spec(ClaudeTransport t) {
-  uint8_t i = (uint8_t)t;
-  return i < CLAUDE_TRANSPORT_COUNT ? &kTransports[i] : nullptr;
+  for (const TransportSpec &s : kTransports)
+    if (s.id == t) return &s;
+  return nullptr;
 }
 
 const char *transportName(ClaudeTransport t) { return spec(t) ? spec(t)->name : "?"; }

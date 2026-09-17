@@ -260,7 +260,10 @@ static void handleClaudeSave() {
   strlcpy(p.orgId, org.c_str(), sizeof(p.orgId));
   p.enabled = argBool("enabled");
   if (!configManager.saveClaude(idx, p)) return sendError(500, "save failed");
-  sendOk();
+  JsonDocument doc;  // az idx kell a kliensnek: "Authenticate now" = mentes + azonnali login ugyanarra a profilra
+  doc["ok"] = true;
+  doc["idx"] = idx;
+  sendJson(200, doc);
 }
 
 // --- OAuth on-device login (PKCE) ---
