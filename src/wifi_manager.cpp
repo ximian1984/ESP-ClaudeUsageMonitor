@@ -9,6 +9,15 @@
 WifiManager wifiManager;
 
 static bool webScanPending = false;
+
+// Sikertelen csatlakozas gyors felismerese (rossz jelszo, AP nem valaszol) a STA_DISCONNECTED esemenybol.
+// Az esemeny az Arduino event-taskban jon, ezert csak atomi szamlalok. A 8-as ok (ASSOC_LEAVE) a sajat
+// WiFi.disconnect() hivasunk — azt nem szamoljuk. A core az ELSO csatlakozaskor egyszer magatol ujraprobal
+// (WiFiGeneric.cpp:1079), ezert egyetlen bontas meg nem biztos kudarc: lasd CONNECT_FAIL_GRACE_MS.
+static volatile uint16_t g_attemptDisconnects = 0;
+static volatile uint8_t g_lastDisconnectReason = 0;
+static volatile uint32_t g_lastDisconnectMs = 0;
+static const uint32_t CONNECT_FAIL_GRACE_MS = 4000;
 static const size_t MAX_SCAN_ENTRIES = 20;
 
 void WifiManager::begin(bool forceSetup) {
@@ -28,6 +37,13 @@ void WifiManager::begin(bool forceSetup) {
     Serial.printf("[wifi] SCAN_DONE esemeny: status %u, %u talalat, t=%lu ms\n", (unsigned)info.wifi_scan_done.status,
                   (unsigned)info.wifi_scan_done.number, (unsigned long)millis());
   }, ARDUINO_EVENT_WIFI_SCAN_DONE);
+  WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t info) {
+    uint8_t reason = info.wifi_sta_disconnected.reason;
+    if (reason == WIFI_REASON_ASSOC_LEAVE) return;  // sajat disconnect()
+    g_lastDisconnectReason = reason;
+    g_lastDisconnectMs = millis();
+    g_attemptDisconnects++;
+  }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
   if (forceSetup) {
     startAp(true);
@@ -139,6 +155,8 @@ void WifiManager::tryNextCandidate() {
   // Csak az SSID es a profil-index kerul logba, a jelszo soha.
   Serial.printf("[wifi] csatlakozas: profil %d, SSID '%s'\n", _candidates[_candIdx].profileIdx, w.ssid);
   WiFi.disconnect();
+  g_attemptDisconnects = 0;
+  g_lastDisconnectReason = 0;
   WiFi.begin(w.ssid, w.password[0] ? w.password : nullptr);
   _connectedSsid = w.ssid;
   if (_state != WifiState::ApFallback) _state = WifiState::Connecting;
@@ -208,6 +226,14 @@ void WifiManager::loop() {
           _stateSinceMs = now;
           _lostSinceMs = 0;
           _candidates.clear();
+        } else if (g_attemptDisconnects >= 2 ||
+                   (g_attemptDisconnects >= 1 && now - g_lastDisconnectMs > CONNECT_FAIL_GRACE_MS)) {
+          // Rossz jelszo tipikusan: 15 (4WAY_HANDSHAKE_TIMEOUT), 202 (AUTH_FAIL), 204 (HANDSHAKE_TIMEOUT).
+          uint8_t r = g_lastDisconnectReason;
+          Serial.printf("[wifi] sikertelen: '%s', ok %u (%s), %lu ms -> kovetkezo jelolt\n", _connectedSsid.c_str(),
+                        (unsigned)r, WiFi.disconnectReasonName((wifi_err_reason_t)r), (unsigned long)(now - _stateSinceMs));
+          _candIdx++;
+          tryNextCandidate();
         } else if (now - _stateSinceMs > WIFI_CONNECT_TIMEOUT_MS) {
           Serial.println("[wifi] idotullepes, kovetkezo jelolt");
           _candIdx++;
