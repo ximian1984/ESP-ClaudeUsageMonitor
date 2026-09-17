@@ -6,7 +6,7 @@ beépített 160×80-as kijelzőn váltogatja több Claude-fiók adatait. Nincs k
 Spec: [`../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md`](../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md) ·
 Mért alapok, döntések: [`PLAN.md`](PLAN.md)
 
-> **Állapot (2026-09-17):** a firmware fordul (0 warning), flash-kész, de **vason még nem futott**. Az adatlekérés elsődleges útja az
+> **Állapot (2026-09-17):** első flash **vason sikeres** (host): indul, a kijelzőn `NO WIFI - SETUP`. Wi-Fi, OAuth-login és usage-lekérés vason még nem futott (PLAN 2.11). Az adatlekérés elsődleges útja az
 > **OAuth on-device bejelentkezés + automatikus tokenfrissítés** (11.); a sessionKey másodlagos opció.
 > Amit itt `⚠ [vason mérendő]` jelöl, az a forrásból következik, nem mérésből.
 
