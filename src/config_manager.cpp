@@ -90,6 +90,35 @@ DeviceConfig ConfigManager::snapshot() {
   return _cfg;
 }
 
+void ConfigManager::copyTo(DeviceConfig &out) {
+  Lock l(_mtx);
+  out = _cfg;
+}
+
+bool ConfigManager::importAll(const DeviceConfig &in) {
+  Lock l(_mtx);
+  for (int i = 0; i < MAX_WIFI_PROFILES; i++) {
+    _cfg.wifi[i] = in.wifi[i];
+    writeWifi(i);
+  }
+  for (int i = 0; i < MAX_CLAUDE_PROFILES; i++) {
+    _cfg.claude[i] = in.claude[i];
+    _cfg.claude[i].editSeq = ++_editCounter;
+    writeClaude(i);
+  }
+  _cfg.rotationSec = in.rotationSec;
+  _cfg.refreshSec = in.refreshSec;
+  strlcpy(_cfg.tz, in.tz, sizeof(_cfg.tz));
+  Preferences p;
+  p.begin(NS, false);
+  p.putUChar("rot", _cfg.rotationSec);
+  p.putUShort("refr", _cfg.refreshSec);
+  p.putString("tz", _cfg.tz);
+  p.end();
+  _version++;
+  return true;
+}
+
 void ConfigManager::writeWifi(int i) {
   const WifiProfile &w = _cfg.wifi[i];
   Preferences p;

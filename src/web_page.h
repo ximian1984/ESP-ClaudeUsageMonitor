@@ -104,6 +104,19 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
   <button type="submit">Save time zone</button>
 </form>
 
+<h2>Backup (export / import)</h2>
+<form onsubmit="return false">
+  <label><input type="checkbox" id="expSecrets"> include secrets (Wi-Fi passwords, Claude tokens)</label>
+  <div class="muted">Without secrets the file is safe to keep anywhere. With secrets, treat the file like a password
+    (requires an admin password on the device). A restored Claude token may already be expired or rotated - then
+    just authenticate again.</div>
+  <button type="button" class="primary" onclick="doExport()">Export settings</button>
+  <label>Import settings from file (replaces ALL Wi-Fi and Claude profiles, display and time zone)</label>
+  <input type="file" id="impFile" accept="application/json,.json">
+  <div class="muted">Profiles in the file without secrets keep the passwords/tokens already on the device (same SSID, same Claude name).</div>
+  <button type="button" class="primary" onclick="doImport()">Import settings</button>
+</form>
+
 <h2>Admin password</h2>
 <form onsubmit="return saveAdmin(event)">
   <div class="muted" id="adminInfo"></div>
@@ -217,6 +230,23 @@ function saveClaude(ev){ev.preventDefault();const f=ev.target;const d=formData(f
 function onTzSel(){const v=$('tzSel').value;if(v)$('tzStr').value=v;else $('tzStr').focus()}
 function showTz(tz){$('tzStr').value=tz;const o=[...$('tzSel').options].find(x=>x.value===tz);$('tzSel').value=o?tz:''}
 function saveTz(ev){ev.preventDefault();post('/api/timezone',{tz:$('tzStr').value.trim()}).then(j=>{say('Time zone saved, local time: '+j.localTime);$('devTime').textContent=j.localTime}).catch(e=>say(e.message));return false}
+function doExport(){const s=$('expSecrets').checked?'1':'0';const h={};if(token)h['X-CMon-Token']=token;
+  fetch('/api/export?secrets='+s,{headers:h,cache:'no-store'}).then(r=>r.text().then(t=>{
+    if(r.status===401){lock();throw new Error('login required')}
+    if(!r.ok){let e='export failed';try{e=JSON.parse(t).error||e}catch(x){}throw new Error(e)}return t}))
+  .then(t=>{const n='device-config-'+new Date().toISOString().slice(0,10)+(s==='1'?'-SECRETS':'')+'.json';
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'application/json'}));a.download=n;
+    document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);say('Exported: '+n)})
+  .catch(e=>say(e.message))}
+function doImport(){const f=$('impFile').files[0];if(!f){say('Choose a file first');return}
+  f.text().then(t=>{try{JSON.parse(t)}catch(e){throw new Error('Not a valid JSON file')}
+    if(!confirm('Import replaces ALL Wi-Fi and Claude profiles, display and time zone settings. Continue?'))return;
+    const h={'X-CMon':'1','Content-Type':'application/json'};if(token)h['X-CMon-Token']=token;
+    return fetch('/api/import',{method:'POST',headers:h,body:t}).then(r=>r.json().then(j=>{
+      if(r.status===401){lock();throw new Error('login required')}
+      if(!j.ok)throw new Error(j.error||'import failed');
+      $('impFile').value='';say('Imported: '+j.wifi+' Wi-Fi, '+j.claude+' Claude profiles'+(j.reconnect?' - Wi-Fi reconnecting...':''));load()}))})
+  .catch(e=>say(e.message))}
 function saveDisplay(ev){ev.preventDefault();Promise.all([post('/api/display',{rotationSec:$('rot').value}),post('/api/refresh',{refreshSec:$('refr').value})]).then(()=>say('Saved')).catch(e=>say(e.message));return false}
 
 load();setInterval(loadStatus,5000);

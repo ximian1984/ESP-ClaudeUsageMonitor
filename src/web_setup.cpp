@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <WebServer.h>
 #include <esp_random.h>
+#include <memory>
 #include <utility>
 
 #include "admin_auth.h"
@@ -457,6 +458,192 @@ static void handleAdminPassword() {
   sendOk();  // minden token ervenytelen lett -> a bongeszonek ujra be kell lepnie
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// Beallitasok exportja / importja (projektgazda, 2026-09-17).
+// Export: JSON-fajl. Titok (Wi-Fi-jelszo, Claude access/refresh token) CSAK kifejezett keresre (?secrets=1), es csak ha
+// van admin-jelszo — kulonben egy jelszo nelkuli eszkozrol a LAN-on barki kimenthetne a tokeneket.
+// Import: az osszes Wi-Fi- es Claude-profil + megjelenites/TZ cserje. Ahol a fajlban nincs titok, a MEGLEVO titkot
+// tartja meg (Wi-Fi: azonos SSID; Claude: azonos nev + forras), igy egy titok nelkuli export visszatoltese nem
+// jelentkeztet ki.
+// ---------------------------------------------------------------------------------------------
+static const char *EXPORT_FORMAT = "device-config";
+static const int EXPORT_VERSION = 1;
+
+static void handleExport() {
+  if (!guardRead()) return;
+  bool secrets = server.arg("secrets") == "1";
+  if (secrets && !adminAuth.passwordSet()) return sendError(403, "set an admin password before exporting secrets");
+  std::unique_ptr<DeviceConfig> cfg(new DeviceConfig);
+  configManager.copyTo(*cfg);
+  JsonDocument doc;
+  doc["format"] = EXPORT_FORMAT;
+  doc["version"] = EXPORT_VERSION;
+  doc["firmware"] = FW_VERSION;
+  doc["exportedAt"] = TimeManager::localDateTime(timeManager.now());
+  doc["secrets"] = secrets;
+  JsonArray wa = doc["wifi"].to<JsonArray>();
+  for (int i = 0; i < MAX_WIFI_PROFILES; i++) {
+    const WifiProfile &w = cfg->wifi[i];
+    if (!w.used) continue;
+    JsonObject o = wa.add<JsonObject>();
+    o["ssid"] = w.ssid;
+    o["enabled"] = w.enabled;
+    o["priority"] = w.priority;
+    if (secrets) o["password"] = w.password;
+  }
+  JsonArray ca = doc["claude"].to<JsonArray>();
+  for (int i = 0; i < MAX_CLAUDE_PROFILES; i++) {
+    const ClaudeProfile &c = cfg->claude[i];
+    if (!c.used) continue;
+    JsonObject o = ca.add<JsonObject>();
+    o["name"] = c.name;
+    o["transport"] = transportName((ClaudeTransport)c.transport);
+    o["orgId"] = c.orgId;
+    o["enabled"] = c.enabled;
+    if (secrets) {
+      o["auth"] = c.auth;
+      o["refresh"] = c.refresh;
+      o["scope"] = c.scope;
+      o["expiresAt"] = c.expiresAt;
+    }
+  }
+  doc["rotationSec"] = cfg->rotationSec;
+  doc["refreshSec"] = cfg->refreshSec;
+  doc["tz"] = cfg->tz;
+  Serial.printf("[web] export: %u Wi-Fi, %u Claude, titok=%s\n", (unsigned)wa.size(), (unsigned)ca.size(), secrets ? "igen" : "nem");
+  sendJson(200, doc);
+}
+
+static bool tokenString(const char *s) {  // fejlecbe kerul: lathato ASCII, szokoz/;/, nelkul
+  if (!s) return false;
+  size_t n = strlen(s);
+  if (n > CLAUDE_AUTH_MAX) return false;
+  for (size_t i = 0; i < n; i++)
+    if (s[i] <= 0x20 || s[i] > 0x7E || s[i] == ';' || s[i] == ',') return false;
+  return true;
+}
+
+static void handleImport() {
+  if (!guardPost()) return;
+  const String &body = server.arg("plain");
+  if (body.isEmpty() || body.length() > 16384) return sendError(400, "empty or too large file");
+  JsonDocument in;
+  if (deserializeJson(in, body)) return sendError(400, "not a valid JSON file");
+  if (!(in["format"] == EXPORT_FORMAT) || (in["version"] | 0) != EXPORT_VERSION)
+    return sendError(400, "not a settings export of this device (format/version)");
+  JsonArrayConst wa = in["wifi"].as<JsonArrayConst>();
+  JsonArrayConst ca = in["claude"].as<JsonArrayConst>();
+  if (wa.size() > MAX_WIFI_PROFILES) return sendError(400, "too many Wi-Fi profiles");
+  if (ca.size() > MAX_CLAUDE_PROFILES) return sendError(400, "too many Claude profiles");
+
+  std::unique_ptr<DeviceConfig> cur(new DeviceConfig), nc(new DeviceConfig);
+  configManager.copyTo(*cur);
+  *nc = *cur;  // AP-jelszo es minden, amit a fajl nem ir felul
+  for (auto &w : nc->wifi) w = WifiProfile();
+  for (auto &c : nc->claude) c = ClaudeProfile();
+
+  int wi = 0;
+  for (JsonObjectConst o : wa) {
+    const char *ssid = o["ssid"] | "";
+    if (!ssid[0] || strlen(ssid) > WIFI_SSID_MAX) return sendError(400, "Wi-Fi: SSID length 1-32");
+    WifiProfile &w = nc->wifi[wi++];
+    w.used = true;
+    strlcpy(w.ssid, ssid, sizeof(w.ssid));
+    w.enabled = o["enabled"] | true;
+    w.priority = (int16_t)constrain((int)(o["priority"] | 0), -1000, 1000);
+    if (o["password"].is<const char *>()) {
+      const char *pw = o["password"];
+      size_t n = strlen(pw);
+      if (n && (n < 8 || n > WIFI_PASS_MAX)) return sendError(400, "Wi-Fi: password length 8-64 or empty");
+      strlcpy(w.password, pw, sizeof(w.password));
+    } else {
+      for (const WifiProfile &old : cur->wifi)  // nincs a fajlban: a meglevo jelszo marad (azonos SSID)
+        if (old.used && strcmp(old.ssid, ssid) == 0) strlcpy(w.password, old.password, sizeof(w.password));
+    }
+  }
+
+  int ci = 0;
+  for (JsonObjectConst o : ca) {
+    ClaudeProfile &c = nc->claude[ci];
+    String name = o["name"] | "";
+    name.trim();
+    if (name.isEmpty()) {
+      char buf[CLAUDE_NAME_MAX + 1];
+      snprintf(buf, sizeof(buf), "Profile-%02u", (unsigned)(esp_random() % 100));
+      name = buf;
+    }
+    if (name.length() > CLAUDE_NAME_MAX || !printableAscii(name, true)) return sendError(400, "Claude: name max 12 ASCII chars");
+    String tr = o["transport"] | "oauth";
+    int transport = -1;
+    for (int t = 0; t < CLAUDE_TRANSPORT_COUNT; t++)
+      if (tr == transportName((ClaudeTransport)t)) transport = t;
+    if (transport < 0) return sendError(400, "Claude: transport must be oauth or web-session");
+    const char *org = o["orgId"] | "";
+    if (org[0] ? !isValidOrgId(org) : transportNeedsOrgId((ClaudeTransport)transport))
+      return sendError(400, "Claude: Organization ID must be a UUID");
+    c.used = true;
+    c.enabled = o["enabled"] | true;
+    c.transport = (uint8_t)transport;
+    strlcpy(c.name, name.c_str(), sizeof(c.name));
+    strlcpy(c.orgId, org, sizeof(c.orgId));
+    if (o["auth"].is<const char *>() || o["refresh"].is<const char *>()) {
+      const char *a = o["auth"] | "", *r = o["refresh"] | "", *sc = o["scope"] | "";
+      if (!tokenString(a) || !tokenString(r) || strlen(sc) > CLAUDE_SCOPE_MAX) return sendError(400, "Claude: invalid token field");
+      strlcpy(c.auth, a, sizeof(c.auth));
+      strlcpy(c.refresh, r, sizeof(c.refresh));
+      strlcpy(c.scope, sc, sizeof(c.scope));
+      c.expiresAt = o["expiresAt"] | (uint32_t)0;
+    } else {
+      for (const ClaudeProfile &old : cur->claude)  // nincs a fajlban: a meglevo tokenek maradnak (nev + forras)
+        if (old.used && old.transport == c.transport && strcmp(old.name, c.name) == 0) {
+          strlcpy(c.auth, old.auth, sizeof(c.auth));
+          strlcpy(c.refresh, old.refresh, sizeof(c.refresh));
+          strlcpy(c.scope, old.scope, sizeof(c.scope));
+          c.expiresAt = old.expiresAt;
+        }
+    }
+    ci++;
+  }
+
+  int rot = in["rotationSec"] | (int)cur->rotationSec;
+  int refr = in["refreshSec"] | (int)cur->refreshSec;
+  if (rot < ROTATION_MIN_S || rot > ROTATION_MAX_S) return sendError(400, "rotation 1-60 sec");
+  if (refr < REFRESH_PERIOD_MIN_S || refr > REFRESH_PERIOD_MAX_S) return sendError(400, "refresh 60-3600 sec");
+  nc->rotationSec = (uint8_t)rot;
+  nc->refreshSec = (uint16_t)refr;
+  const char *tz = in["tz"] | cur->tz;
+  if (!TimeManager::validPosixTz(tz)) return sendError(400, "invalid POSIX TZ");
+  strlcpy(nc->tz, tz, sizeof(nc->tz));
+
+  // Minden validalva -> egyben csere.
+  if (!configManager.importAll(*nc)) return sendError(500, "save failed");
+  for (int i = 0; i < MAX_CLAUDE_PROFILES; i++) {
+    const ClaudeProfile &a = cur->claude[i], &b = nc->claude[i];
+    if (a.used != b.used || a.transport != b.transport || strcmp(a.name, b.name) || strcmp(a.orgId, b.orgId))
+      usageCache.forgetLastKnown(i);
+  }
+  timeManager.setTimezone(nc->tz);
+  // Wi-Fi: ujravalasztas csak ha a mostani kapcsolat erintett (nincs benne engedelyezve, vagy mas a jelszava).
+  bool keep = false;
+  if (wifiManager.state() == WifiState::Connected) {
+    String curSsid = wifiManager.staSsid();
+    for (const WifiProfile &w : nc->wifi) {
+      if (!w.used || !w.enabled || curSsid != w.ssid) continue;
+      for (const WifiProfile &o : cur->wifi)
+        if (o.used && curSsid == o.ssid && strcmp(o.password, w.password) == 0) keep = true;
+    }
+  }
+  if (!keep && wifiManager.state() != WifiState::ApForced) wifiManager.requestReselect();
+  Serial.printf("[web] import: %d Wi-Fi, %d Claude, ujravalasztas=%s\n", wi, ci, keep ? "nem" : "igen");
+  JsonDocument doc;
+  doc["ok"] = true;
+  doc["wifi"] = wi;
+  doc["claude"] = ci;
+  doc["reconnect"] = !keep;
+  sendJson(200, doc);
+}
+
 static bool restartPending = false;
 static uint32_t restartAtMs = 0;
 
@@ -496,6 +683,8 @@ void WebSetup::begin() {
   server.on("/api/restart", HTTP_POST, handleRestart);
   server.on("/api/login", HTTP_POST, handleLogin);
   server.on("/api/admin", HTTP_POST, handleAdminPassword);
+  server.on("/api/export", HTTP_GET, handleExport);
+  server.on("/api/import", HTTP_POST, handleImport);
   server.onNotFound([] { server.send(404, "text/plain", "not found"); });
   server.begin();
 }

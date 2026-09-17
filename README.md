@@ -323,6 +323,31 @@ OAuth: GET https://api.anthropic.com/api/oauth/usage
 
 Elfelejtett admin-jelszó: forced setup (7.), abban a módban nem kell jelszó.
 
+### Beállítások mentése: export / import
+
+A setup-oldal **Backup (export / import)** részén.
+
+- **Export settings** → `device-config-ÉÉÉÉ-HH-NN.json`: Wi-Fi- és Claude-profilok, rotáció, frissítés, időzóna.
+  - Alapból **titok nélkül**: nincs benne Wi-Fi-jelszó és Claude-token.
+  - *include secrets* bepipálva → `…-SECRETS.json`, benne a jelszavak és a tokenek. Csak akkor engedi, ha van
+    admin-jelszó; a fájlt jelszóként kell kezelni. Egy visszatöltött Claude-token közben lejárhatott vagy rotálódhatott →
+    ilyenkor *Authenticate*.
+- **Import settings**: **minden** Wi-Fi- és Claude-profilt, a megjelenítést és az időzónát lecseréli (megerősítést kér).
+  - Az AP-jelszó és az admin-jelszó marad.
+  - Ahol a fájlban nincs titok, a **meglévő marad**: Wi-Fi azonos SSID-vel, Claude azonos névvel és forrással.
+    Egy titok nélküli export visszatöltése tehát nem jelentkeztet ki.
+  - Hibás fájlnál (formátum, hossz, UUID, TZ) semmi nem változik.
+- Mérve (2026-09-17, Playwright, `test/e2e/backup.test.js`, 10/10):
+  - a titok nélküli exportban nincs `password`/`auth`/`refresh` kulcs;
+  - a secrets-exportban megvannak (xiTech: auth 108, refresh 108 karakter — csak hossz);
+  - token nélkül `401`, rossz formátum → hiba;
+  - a titok nélküli export visszatöltése után a konfiguráció azonos, a jelszavak és a tokenek megmaradtak, a lekérés `HTTP 200`.
+
+**Felület-teszt:** `test/e2e/setup_ui.test.js` (25/25). Login-héj, rossz és jó jelszó, Claude-profil mentés/átnevezés/
+*Authenticate* (új fül az authorize URL-lel), `Profile-XX`, ékezetes név elutasítva, Wi-Fi-profil mentés/törlés
+újratöltés nélkül, időzóna, megjelenítés, scan, újratöltés, kijelentkezés. Csak TESZT-adatot hoz létre és töröl. Futtatás
+a fájlok fejlécében; a jelszót fájlból olvassa (`CMON_PW_FILE`), a repóban nincs.
+
 ## 14. Biztonsági megjegyzések
 
 - Titok (Wi-Fi-jelszó, Claude session) csak NVS-ben van. Nincs a kódban, nincs Serial-logban, nincs

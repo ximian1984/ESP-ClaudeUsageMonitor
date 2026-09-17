@@ -51,6 +51,10 @@ class ConfigManager {
 
   // Olvasas: masolat, mutex alatt (a fetch-task is olvas).
   DeviceConfig snapshot();
+  // Masolat a hivo altal adott (pl. heapen levo) peldanyba — a ~6 KB-os DeviceConfig ne a stacken legyen.
+  void copyTo(DeviceConfig &out);
+  // Import: az osszes Wi-Fi- es Claude-slot + rotacio/frissites/TZ cserje (az AP-jelszo marad). A hivo validal.
+  bool importAll(const DeviceConfig &in);
   uint32_t version() const { return _version; }  // minden mentes noveli
 
   bool saveWifi(int idx, const WifiProfile &p);
