@@ -97,6 +97,8 @@ static void handleStatus() {
   w["rssi"] = wifiManager.rssi();
   w["apSsid"] = wifiManager.apActive() ? wifiManager.apSsid() : String("");
   doc["timeSynced"] = timeManager.synced();
+  doc["localTime"] = TimeManager::localDateTime(timeManager.now());
+  doc["tz"] = timeManager.timezone();
   doc["uptimeS"] = millis() / 1000;
   doc["freeHeap"] = ESP.getFreeHeap();
   doc["claudeFetchCount"] = refreshScheduler.fetchCount();
@@ -152,6 +154,7 @@ static void handleConfig() {
   }
   doc["rotationSec"] = cfg.rotationSec;
   doc["refreshSec"] = cfg.refreshSec;
+  doc["tz"] = cfg.tz;
   doc["maxWifi"] = MAX_WIFI_PROFILES;
   doc["maxClaude"] = MAX_CLAUDE_PROFILES;
   sendJson(200, doc);
@@ -354,6 +357,19 @@ static void handleRefresh() {
   sendOk();
 }
 
+static void handleTimezone() {
+  if (!guardPost()) return;
+  String tz = server.arg("tz");
+  tz.trim();
+  if (!TimeManager::validPosixTz(tz.c_str())) return sendError(400, "POSIX TZ: 3-47 chars, e.g. CET-1CEST,M3.5.0,M10.5.0/3");
+  if (!configManager.saveTimezone(tz.c_str())) return sendError(500, "save failed");
+  timeManager.setTimezone(tz.c_str());
+  JsonDocument doc;
+  doc["ok"] = true;
+  doc["localTime"] = TimeManager::localDateTime(timeManager.now());
+  sendJson(200, doc);
+}
+
 static void handleDisplay() {
   if (!guardPost()) return;
   int sec = argInt("rotationSec", -1);
@@ -432,6 +448,7 @@ void WebSetup::begin() {
   server.on("/api/claude", HTTP_POST, handleClaudeSave);
   server.on("/api/claude/delete", HTTP_POST, handleClaudeDelete);
   server.on("/api/display", HTTP_POST, handleDisplay);
+  server.on("/api/timezone", HTTP_POST, handleTimezone);
   server.on("/api/refresh", HTTP_POST, handleRefresh);
   server.on("/api/oauth/start", HTTP_POST, handleOAuthStart);
   server.on("/api/oauth/finish", HTTP_POST, handleOAuthFinish);

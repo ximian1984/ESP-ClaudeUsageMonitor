@@ -33,6 +33,7 @@ struct DeviceConfig {
   uint8_t rotationSec = ROTATION_DEFAULT_S;
   uint16_t refreshSec = CLAUDE_REFRESH_DEFAULT_S;  // profilonkenti API-frissites (spec 14.)
   char apPassword[16] = "";  // egyszer generalt, NVS-ben marad
+  char tz[TZ_POSIX_MAX + 1] = TZ_EUROPE_BUDAPEST;  // POSIX TZ (a kijelzett helyi idohoz)
 };
 
 // A kijelzonek/utemezonek eleg ennyi — nem kell a titkokat is masolni.
@@ -58,6 +59,7 @@ class ConfigManager {
   bool deleteClaude(int idx);
   bool saveRotation(uint8_t sec);
   bool saveRefreshSec(uint16_t sec);
+  bool saveTimezone(const char *posixTz);
   ClaudeBrief brief();  // engedelyezett profilok neve+indexe, titok nelkul
 
   // Automatikus token-frissites eredmenye. Csak akkor ir, ha a profilt kozben a felhasznalo nem

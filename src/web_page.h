@@ -86,6 +86,31 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
   <button type="submit">Save</button>
 </form>
 
+<h2>Time zone</h2>
+<form onsubmit="return saveTz(event)">
+  <div class="muted">Device local time: <span id="devTime">-</span></div>
+  <label>Time zone (used for reset times on the display)</label>
+  <select id="tzSel" onchange="onTzSel()">
+    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Europe/Budapest, Vienna, Berlin, Paris (CET/CEST)</option>
+    <option value="GMT0BST,M3.5.0/1,M10.5.0">Europe/London (GMT/BST)</option>
+    <option value="EET-2EEST,M3.5.0/3,M10.5.0/4">Europe/Helsinki, Athens, Bucharest (EET/EEST)</option>
+    <option value="MSK-3">Europe/Moscow (MSK)</option>
+    <option value="UTC0">UTC</option>
+    <option value="EST5EDT,M3.2.0,M11.1.0">America/New_York (EST/EDT)</option>
+    <option value="CST6CDT,M3.2.0,M11.1.0">America/Chicago (CST/CDT)</option>
+    <option value="MST7MDT,M3.2.0,M11.1.0">America/Denver (MST/MDT)</option>
+    <option value="PST8PDT,M3.2.0,M11.1.0">America/Los_Angeles (PST/PDT)</option>
+    <option value="<+04>-4">Asia/Dubai (+04)</option>
+    <option value="IST-5:30">Asia/Kolkata (IST)</option>
+    <option value="<+08>-8">Asia/Singapore (+08)</option>
+    <option value="JST-9">Asia/Tokyo (JST)</option>
+    <option value="AEST-10AEDT,M10.1.0,M4.1.0/3">Australia/Sydney (AEST/AEDT)</option>
+    <option value="">Custom POSIX TZ string...</option>
+  </select>
+  <label>POSIX TZ string</label><input type="text" id="tzStr" maxlength="47" autocomplete="off">
+  <button type="submit">Save time zone</button>
+</form>
+
 <h2>Admin password</h2>
 <form onsubmit="return saveAdmin(event)">
   <div class="muted" id="adminInfo"></div>
@@ -118,6 +143,7 @@ function btn(td,label,fn,cls){const b=document.createElement('button');b.type='b
 let cfg=null;
 
 function loadStatus(){fetch('/api/status').then(r=>r.json()).then(s=>{
+  $('devTime').textContent=s.localTime?s.localTime+' ('+s.tz+')':'not synced yet';
   const t=$('dev');t.textContent='';
   const last=s.lastClaudeUpdate?new Date(s.lastClaudeUpdate*1000).toLocaleString():'never';
   const rows=[['Board',s.board],['Firmware',s.firmware],['Wi-Fi state',s.wifi.state],['SSID',s.wifi.ssid||s.wifi.apSsid],
@@ -129,7 +155,7 @@ function loadStatus(){fetch('/api/status').then(r=>r.json()).then(s=>{
   if(cfg)renderClaude(s.claude);
 }).catch(()=>{})}
 
-function load(tries){tries=tries||0;fetch('/api/config').then(r=>r.json()).then(c=>{cfg=c;$('rot').value=c.rotationSec;$('refr').value=c.refreshSec;renderWifi();onTransport();loadStatus()}).catch(()=>{if(tries<15){say('Device busy (Wi-Fi reconnect?), retrying...');setTimeout(()=>load(tries+1),2000)}else say('Device not reachable - reload the page')})}
+function load(tries){tries=tries||0;fetch('/api/config').then(r=>r.json()).then(c=>{cfg=c;$('rot').value=c.rotationSec;$('refr').value=c.refreshSec;showTz(c.tz||'');renderWifi();onTransport();loadStatus()}).catch(()=>{if(tries<15){say('Device busy (Wi-Fi reconnect?), retrying...');setTimeout(()=>load(tries+1),2000)}else say('Device not reachable - reload the page')})}
 
 function renderWifi(){
   const tb=$('wifiList');tb.textContent='';
@@ -188,6 +214,9 @@ function resetClaudeForm(){const f=$('claudeForm');f.reset();f.idx.value=-1;onTr
 function saveClaude(ev){ev.preventDefault();const f=ev.target;const d=formData(f);if(!d.enabled)d.enabled='0';if(d.transport==='oauth'){delete d.auth;delete d.orgId}else if(d.auth)d.changeAuth='1';
   post('/api/claude',d).then(()=>{say('Claude profile saved');resetClaudeForm();load()}).catch(e=>say(e.message));return false}
 
+function onTzSel(){const v=$('tzSel').value;if(v)$('tzStr').value=v;else $('tzStr').focus()}
+function showTz(tz){$('tzStr').value=tz;const o=[...$('tzSel').options].find(x=>x.value===tz);$('tzSel').value=o?tz:''}
+function saveTz(ev){ev.preventDefault();post('/api/timezone',{tz:$('tzStr').value.trim()}).then(j=>{say('Time zone saved, local time: '+j.localTime);$('devTime').textContent=j.localTime}).catch(e=>say(e.message));return false}
 function saveDisplay(ev){ev.preventDefault();Promise.all([post('/api/display',{rotationSec:$('rot').value}),post('/api/refresh',{refreshSec:$('refr').value})]).then(()=>say('Saved')).catch(e=>say(e.message));return false}
 
 load();setInterval(loadStatus,5000);

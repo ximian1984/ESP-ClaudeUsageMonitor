@@ -39,7 +39,7 @@ void setup() {
   configManager.begin();
   adminAuth.begin();
   usageCache.begin();
-  timeManager.begin();
+  timeManager.begin(configManager.snapshot().tz);
   displayManager.begin();
 
   bool forced = bootWindow();

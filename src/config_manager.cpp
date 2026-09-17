@@ -70,6 +70,7 @@ void ConfigManager::load() {
   }
   _cfg.rotationSec = constrain(p.getUChar("rot", ROTATION_DEFAULT_S), ROTATION_MIN_S, ROTATION_MAX_S);
   _cfg.refreshSec = constrain((int)p.getUShort("refr", CLAUDE_REFRESH_DEFAULT_S), REFRESH_PERIOD_MIN_S, REFRESH_PERIOD_MAX_S);
+  if (p.isKey("tz") && p.getString("tz", _cfg.tz, sizeof(_cfg.tz)) == 0) strlcpy(_cfg.tz, TZ_EUROPE_BUDAPEST, sizeof(_cfg.tz));
 
   if (p.getString("appass", _cfg.apPassword, sizeof(_cfg.apPassword)) == 0 || strlen(_cfg.apPassword) < 8) {
     generateApPassword(_cfg.apPassword, sizeof(_cfg.apPassword));
@@ -161,6 +162,18 @@ bool ConfigManager::deleteClaude(int idx) {
   _cfg.claude[idx] = ClaudeProfile();
   _cfg.claude[idx].editSeq = ++_editCounter;
   writeClaude(idx);
+  _version++;
+  return true;
+}
+
+bool ConfigManager::saveTimezone(const char *posixTz) {
+  if (!posixTz || !posixTz[0] || strlen(posixTz) > TZ_POSIX_MAX) return false;
+  Lock l(_mtx);
+  strlcpy(_cfg.tz, posixTz, sizeof(_cfg.tz));
+  Preferences p;
+  p.begin(NS, false);
+  p.putString("tz", _cfg.tz);
+  p.end();
   _version++;
   return true;
 }

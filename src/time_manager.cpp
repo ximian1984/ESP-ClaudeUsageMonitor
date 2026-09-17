@@ -10,15 +10,39 @@ TimeManager timeManager;
 static const time_t VALID_EPOCH_MIN = 1704067200;
 static const uint32_t NTP_ERROR_AFTER_MS = 60000;
 
-void TimeManager::begin() {
-  setenv("TZ", TZ_EUROPE_BUDAPEST, 1);
+void TimeManager::begin(const char *posixTz) { setTimezone(posixTz); }
+
+void TimeManager::setTimezone(const char *posixTz) {
+  if (!validPosixTz(posixTz)) posixTz = TZ_EUROPE_BUDAPEST;
+  strlcpy(_tz, posixTz, sizeof(_tz));
+  setenv("TZ", _tz, 1);
   tzset();
+}
+
+bool TimeManager::validPosixTz(const char *s) {
+  if (!s) return false;
+  size_t n = strlen(s);
+  if (n < 3 || n > TZ_POSIX_MAX) return false;
+  for (size_t i = 0; i < n; i++) {
+    char c = s[i];
+    if (!(isalnum((unsigned char)c) || strchr("+-,.:/<>", c))) return false;
+  }
+  return true;
+}
+
+String TimeManager::localDateTime(time_t t) {
+  if (t < VALID_EPOCH_MIN) return "";
+  struct tm lt;
+  localtime_r(&t, &lt);
+  char buf[20];
+  strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &lt);
+  return buf;
 }
 
 void TimeManager::loop(bool staConnected) {
   if (staConnected && !_started) {
     // configTzTime: TZ + SNTP; az SNTP a hatterben ismetel, nem blokkol.
-    configTzTime(TZ_EUROPE_BUDAPEST, NTP_SERVER_1, NTP_SERVER_2);
+    configTzTime(_tz, NTP_SERVER_1, NTP_SERVER_2);
     _started = true;
     _startedMs = millis();
   }
@@ -41,7 +65,7 @@ String TimeManager::formatRemaining(long s) {
   if (s <= 0) return "--";
   char buf[16];
   long d = s / 86400, h = (s % 86400) / 3600, m = (s % 3600) / 60, sec = s % 60;
-  if (d > 0) snprintf(buf, sizeof(buf), "%ldd%02ldh%02ldm", d, h, m);
+  if (d > 0) snprintf(buf, sizeof(buf), "%ldd%02ldh", d, h);  // napos tavolsagnal a perc csak zsufol (160 px)
   else snprintf(buf, sizeof(buf), "%02ld:%02ld:%02ld", h, m, sec);
   return buf;
 }

@@ -67,6 +67,7 @@ enum class ClaudeTransport : uint8_t {
 #define CLAUDE_MAX_BODY_BYTES     16384
 
 // --- Ido (spec 15.) ---
-#define TZ_EUROPE_BUDAPEST "CET-1CEST,M3.5.0,M10.5.0/3"
+#define TZ_EUROPE_BUDAPEST "CET-1CEST,M3.5.0,M10.5.0/3"  // alapertelmezes; /usr/share/zoneinfo/Europe/Budapest utolso sora
+#define TZ_POSIX_MAX 47   // POSIX TZ-string (setup-oldalon allithato, NVS "tz")
 #define NTP_SERVER_1 "pool.ntp.org"
 #define NTP_SERVER_2 "time.google.com"

@@ -72,7 +72,8 @@ void DisplayManager::drawNoProfiles() {
   text("http://" + wifiManager.ipString(), 0, 56, TFT_CYAN);
 }
 
-// Egy limit ket sora: "LABEL   73% LEFT" + (opcionalis savval) "RESET 02:17:32 @14:30"
+// Egy limit ket sora: "LABEL   73% LEFT" + (opcionalis savval) "RESET 02:17:32 @14:30" / "RESET 3d04h @09.24 09:00"
+// Az ido a beallitott idozonaban (setup-oldal, NVS "tz").
 static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, bool bar, bool dataStale) {
   uint16_t valColor = dataStale ? TFT_DARKGREY : TFT_WHITE;
   if (!l) {
@@ -117,7 +118,7 @@ static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, boo
       time_t t = l->resetAt;
       localtime_r(&t, &lt);
       char buf[12];
-      strftime(buf, sizeof(buf), "%a %H:%M", &lt);
+      strftime(buf, sizeof(buf), "%m.%d %H:%M", &lt);  // datum, nem angol napnev (projektgazda, 2026-09-17)
       when = buf;
     }
     text("RESET " + TimeManager::formatRemaining(secs) + " @" + when, 0, ry, TFT_WHITE);
