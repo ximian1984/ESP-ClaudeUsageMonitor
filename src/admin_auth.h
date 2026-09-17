@@ -13,7 +13,9 @@ class AdminAuth {
 
   enum class LoginResult : uint8_t { Ok, Wrong, LockedOut };
   LoginResult login(const String &password, String &tokenOut);
-  bool tokenValid(const String &token);  // lejarat csuszik: minden sikeres hasznalat meghosszabbitja
+  // touch=true: a lejarat csuszik (felhasznaloi muvelet). Az 5 s-os status-poll touch=false-szal hiv, kulonben a nyitva
+  // hagyott oldal soha nem jarna le.
+  bool tokenValid(const String &token, bool touch = true);
   void logoutAll();
 
   // Ures jelszo = torles. Hibas hossz -> false. Minden token ervenytelenul.

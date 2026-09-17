@@ -30,6 +30,7 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
 </form>
 </div>
 
+<div id="main" style="display:none">
 <h2>Device</h2>
 <table id="dev"></table>
 <button onclick="post('/api/restart',{}).then(()=>say('Restarting...'))">Restart</button>
@@ -119,6 +120,8 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
   <div class="muted">Forgot it? Start setup mode with the BOOT button: in that mode no admin password is needed.
   Note: the device serves plain HTTP, the password travels unencrypted on the local network.</div>
 </form>
+</div>
+
 
 <script>
 const $=id=>document.getElementById(id);
@@ -129,12 +132,17 @@ function post(url,data){
   const body=new URLSearchParams();for(const k in data)body.append(k,data[k]);
   const h={'X-CMon':'1'};if(token)h['X-CMon-Token']=token;
   return fetch(url,{method:'POST',headers:h,body}).then(r=>r.json().then(j=>{
-    if(r.status===401&&url!=='/api/login'){setToken('');$('loginBox').style.display='block'}
+    if(r.status===401&&url!=='/api/login'){setToken('');lock()}
     if(!j.ok)throw new Error(j.error||'error');return j}));
 }
+// Admin-jelszo eseten belepes nelkul csak a login latszik; az olvaso API-k is tokent kernek (401).
+function lock(){$('loginBox').style.display='block';$('main').style.display='none'}
+function unlock(){$('loginBox').style.display='none';$('main').style.display='block'}
+function apiGet(url){const h={};if(token)h['X-CMon-Token']=token;
+  return fetch(url,{headers:h,cache:'no-store'}).then(r=>{if(r.status===401){setToken('');lock();throw new Error('login required')}return r.json()})}
 function doLogin(ev){ev.preventDefault();const f=ev.target;
-  post('/api/login',{password:f.password.value}).then(j=>{setToken(j.token);f.reset();$('loginBox').style.display='none';say('Logged in')}).catch(e=>say(e.message));return false}
-function logout(){setToken('');say('Logged out');loadStatus()}
+  post('/api/login',{password:f.password.value}).then(j=>{setToken(j.token);f.reset();say('Logged in');unlock();load()}).catch(e=>say(e.message));return false}
+function logout(){setToken('');say('Logged out');cfg=null;lock();loadStatus()}
 function saveAdmin(ev){ev.preventDefault();const f=ev.target;
   post('/api/admin',{newPassword:f.newPassword.value}).then(()=>{f.reset();setToken('');say('Admin password saved - log in again if set');loadStatus()}).catch(e=>say(e.message));return false}
 function formData(f){const d={};for(const el of f.elements){if(!el.name)continue;if(el.type==='checkbox'){if(el.checked)d[el.name]='1'}else d[el.name]=el.value}return d}
@@ -142,7 +150,9 @@ function cell(tr,txt){const td=document.createElement('td');td.textContent=txt;t
 function btn(td,label,fn,cls){const b=document.createElement('button');b.type='button';b.textContent=label;if(cls)b.className=cls;b.onclick=fn;td.appendChild(b)}
 let cfg=null;
 
-function loadStatus(){fetch('/api/status').then(r=>r.json()).then(s=>{
+function loadStatus(){apiGet('/api/status').then(s=>{
+  if(s.locked){lock();return}
+  unlock();
   $('devTime').textContent=s.localTime?s.localTime+' ('+s.tz+')':'not synced yet';
   const t=$('dev');t.textContent='';
   const last=s.lastClaudeUpdate?new Date(s.lastClaudeUpdate*1000).toLocaleString():'never';
@@ -151,11 +161,10 @@ function loadStatus(){fetch('/api/status').then(r=>r.json()).then(s=>{
     ['Last Claude update',last],['Claude requests since boot',s.claudeFetchCount],['Free heap',s.freeHeap+' B'],['Uptime',s.uptimeS+' s']];
   for(const [k,v] of rows){const tr=document.createElement('tr');cell(tr,k);cell(tr,String(v));t.appendChild(tr)}
   $('adminInfo').textContent=s.adminSet?(s.adminRequired?'Admin password is set.':'Admin password is set, but not required in setup mode.'):'No admin password: anyone on this network can change the settings.';
-  $('loginBox').style.display=(s.adminRequired&&!token)?'block':'none';
   if(cfg)renderClaude(s.claude);
 }).catch(()=>{})}
 
-function load(tries){tries=tries||0;fetch('/api/config').then(r=>r.json()).then(c=>{cfg=c;$('rot').value=c.rotationSec;$('refr').value=c.refreshSec;showTz(c.tz||'');renderWifi();onTransport();loadStatus()}).catch(()=>{if(tries<15){say('Device busy (Wi-Fi reconnect?), retrying...');setTimeout(()=>load(tries+1),2000)}else say('Device not reachable - reload the page')})}
+function load(tries){tries=tries||0;apiGet('/api/config').then(c=>{unlock();cfg=c;$('rot').value=c.rotationSec;$('refr').value=c.refreshSec;showTz(c.tz||'');renderWifi();onTransport();loadStatus()}).catch(e=>{if(e.message==='login required'){say('Log in to view and change the settings');loadStatus();return}if(tries<15){say('Device busy (Wi-Fi reconnect?), retrying...');setTimeout(()=>load(tries+1),2000)}else say('Device not reachable - reload the page')})}
 
 function renderWifi(){
   const tb=$('wifiList');tb.textContent='';
@@ -175,7 +184,7 @@ function saveWifi(ev){ev.preventDefault();const f=ev.target;const d=formData(f);
   post('/api/wifi',d).then(()=>{say('Wi-Fi profile saved');resetWifiForm();load()}).catch(e=>say(e.message));return false}
 
 function scan(){say('Scanning...');post('/api/scan',{}).then(()=>setTimeout(pollScan,1500)).catch(e=>say(e.message))}
-function pollScan(){fetch('/api/scan').then(r=>r.json()).then(s=>{
+function pollScan(){apiGet('/api/scan').then(s=>{
   if(s.running){setTimeout(pollScan,1000);return}
   const sel=$('scanSel');sel.textContent='';const o0=document.createElement('option');o0.value='';o0.textContent='- '+s.results.length+' networks -';sel.appendChild(o0);
   for(const n of s.results){const o=document.createElement('option');o.value=n.ssid;o.textContent=n.ssid+' ('+n.rssi+' dBm'+(n.secure?'':', open')+')';sel.appendChild(o)}

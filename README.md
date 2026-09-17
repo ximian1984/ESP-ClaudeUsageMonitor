@@ -339,8 +339,14 @@ Elfelejtett admin-jelszó: forced setup (7.), abban a módban nem kell jelszó.
 - A módosító kérések `X-CMon: 1` fejlécet kívánnak (CSRF ellen). A dinamikus adat `textContent`-tel
   kerül az oldalba (a scannelt SSID idegen adat).
 - ⚠ Az eszköz **sima HTTP**-t szolgál ki: az admin-jelszó és a beírt session-érték titkosítatlanul
-  megy át a helyi hálózaton vagy az AP-n. Olvasni (`/api/status`, `/api/config`: SSID-k,
-  profilnevek, org-ID-k) jelszó nélkül is lehet, titkot ezek nem tartalmaznak.
+  megy át a helyi hálózaton vagy az AP-n.
+- **Olvasás is jelszóhoz kötött** (2026-09-17, a projektgazda kérésére), ha van admin-jelszó:
+  - a `/api/config` és a `/api/scan` (GET) token nélkül `401`;
+  - a `/api/status` csak `board`, `firmware`, `adminSet`, `adminRequired` és `locked: true` mezőt ad;
+  - a weboldal belépés nélkül csak a login-mezőt mutatja;
+  - az 5 s-os status-lekérdezés nem hosszabbítja a munkamenetet, így 30 perc tétlenség után lejár.
+  - Mérve token nélkül: 12 módosító végpont + `config`/`scan` → `401`, rossz tokennel is `401`.
+    A belépett ág a projektgazda böngészőjében mérendő.
 - A hibás JSON nem okoz összeomlást: az ArduinoJson hibakódot ad, a firmware `USAGE PARSE`-t mutat.
 
 ## 15. Ismert korlátozások

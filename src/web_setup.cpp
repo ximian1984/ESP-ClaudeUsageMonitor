@@ -63,6 +63,18 @@ static bool guardPost() {
   return true;
 }
 
+// Olvaso kapu: admin-jelszo eseten a konfiguracio (SSID-k, profilnevek, org-ID-k, IP, scan) is csak belepve latszik
+// (projektgazda, 2026-09-17: "login nelkul is latom a beallitasokat"). Kulonben 401.
+static bool readAllowed(bool touch) {
+  return !adminRequired() || adminAuth.tokenValid(server.header("X-CMon-Token"), touch);
+}
+
+static bool guardRead() {
+  if (readAllowed(true)) return true;
+  sendError(401, "login required");
+  return false;
+}
+
 static bool printableAscii(const String &s, bool allowSpace) {
   for (size_t i = 0; i < s.length(); i++) {
     char c = s[i];
@@ -91,6 +103,13 @@ static void handleStatus() {
   JsonDocument doc;
   doc["board"] = BOARD_NAME;
   doc["firmware"] = FW_VERSION;
+  doc["adminSet"] = adminAuth.passwordSet();
+  doc["adminRequired"] = adminRequired();
+  if (!readAllowed(false)) {  // zarolva: csak annyi, amennyi a login-kepernyohoz kell
+    doc["locked"] = true;
+    return sendJson(200, doc);
+  }
+  doc["locked"] = false;
   JsonObject w = doc["wifi"].to<JsonObject>();
   w["state"] = wifiManager.stateName();
   w["ssid"] = wifiManager.staConnected() ? wifiManager.staSsid() : String("");
@@ -103,8 +122,6 @@ static void handleStatus() {
   doc["uptimeS"] = millis() / 1000;
   doc["freeHeap"] = ESP.getFreeHeap();
   doc["claudeFetchCount"] = refreshScheduler.fetchCount();
-  doc["adminSet"] = adminAuth.passwordSet();
-  doc["adminRequired"] = adminRequired();
 
   DeviceConfig cfg = configManager.snapshot();
   time_t lastUpdate = 0;
@@ -136,6 +153,7 @@ static void handleStatus() {
 }
 
 static void handleConfig() {
+  if (!guardRead()) return;
   DeviceConfig cfg = configManager.snapshot();
   JsonDocument doc;
   JsonArray wa = doc["wifi"].to<JsonArray>();
@@ -400,6 +418,7 @@ static void handleScanStart() {
 }
 
 static void handleScanResults() {
+  if (!guardRead()) return;
   JsonDocument doc;
   doc["running"] = wifiManager.scanRunning();
   JsonArray arr = doc["results"].to<JsonArray>();

@@ -85,7 +85,7 @@ AdminAuth::LoginResult AdminAuth::login(const String &password, String &tokenOut
   return r;
 }
 
-bool AdminAuth::tokenValid(const String &token) {
+bool AdminAuth::tokenValid(const String &token, bool touch) {
   if (token.length() != 32) return false;
   xSemaphoreTake(_mtx, portMAX_DELAY);
   bool ok = false;
@@ -97,7 +97,7 @@ bool AdminAuth::tokenValid(const String &token) {
       continue;
     }
     if (constTimeEq((const uint8_t *)t.value, (const uint8_t *)token.c_str(), 32)) {
-      t.lastUseMs = now | 1;
+      if (touch) t.lastUseMs = now | 1;
       ok = true;
     }
   }
