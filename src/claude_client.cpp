@@ -59,7 +59,7 @@ static void authWebSession(HTTPClient &http, const char *auth) {
 //    Mert: 200 + valos minta Bearer <oat01-token> + "anthropic-beta: oauth-2025-04-20" fejleccel, HTTP/1.1,
 //    Cloudflare-kihivas nelkul (a koordinator, 2026-09-16). Hamis tokennel (sajat meres, 2026-09-16): 401
 //    authentication_error "OAuth access token is invalid."; hitelesites nelkul 429 rate_limit_error + Retry-After.
-//    ⚠ [feltarando] az OAuth access token lejarata es frissitese — a firmware NEM frissit tokent.
+//    A token lejarat elotti frissitese NEM itt van: refresh_scheduler.cpp ensureOAuthToken() + oauth_client (PLAN 2.9).
 static void authOAuth(HTTPClient &http, const char *auth) {
   http.addHeader("anthropic-beta", "oauth-2025-04-20");
   String bearer = String("Bearer ") + auth;

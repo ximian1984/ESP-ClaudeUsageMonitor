@@ -288,6 +288,9 @@ static void handleOAuthFinish() {
   String code = server.arg("code");
   code.trim();
   if (code.isEmpty()) return sendError(400, "paste the code#state value");
+  // Pontos ido nelkul a TLS-tanusitvany ervenyessege nem ellenorizheto, es a lejarat (now + expires_in) is hamis lenne.
+  // A login ezert csak Wi-Fi (STA) + NTP utan mehet; a pending login (verifier/state) megmarad, ujra bekuldheto.
+  if (!timeManager.synced()) return sendError(503, "no internet time yet (connect Wi-Fi, wait for NTP), then resubmit");
   // Blokkolo (TLS + kodcsere) — a felhasznalo varja; a setup-oldal addig is fut.
   OAuthTokens t = oauthExchangeCode(code, g_login.verifier, g_login.state);
   if (!t.ok) {

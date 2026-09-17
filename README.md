@@ -6,7 +6,7 @@ beépített 160×80-as kijelzőn váltogatja több Claude-fiók adatait. Nincs k
 Spec: [`../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md`](../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md) ·
 Mért alapok, döntések: [`PLAN.md`](PLAN.md)
 
-> **Állapot (2026-09-16):** a firmware fordul, de **vason még nem futott**. Az adatlekérés elsődleges útja az
+> **Állapot (2026-09-17):** a firmware fordul (0 warning), flash-kész, de **vason még nem futott**. Az adatlekérés elsődleges útja az
 > **OAuth on-device bejelentkezés + automatikus tokenfrissítés** (11.); a sessionKey másodlagos opció.
 > Amit itt `⚠ [vason mérendő]` jelöl, az a forrásból következik, nem mérésből.
 
@@ -48,7 +48,8 @@ cd ClaudeUsageMonitor
 pio run
 ```
 
-Mérve: `SUCCESS`, RAM 15,3 %, Flash 15,2 %.
+Mérve (2026-09-17, tiszta build): `SUCCESS`, **0 warning** (a saját forrásokra `-Wall -Wextra` mellett is),
+RAM 16,1 % (52 876 B), Flash 15,6 % (1 022 573 B).
 
 ⚠ **Zsákutca:** `pio run -v` (bőbeszédű mód) tiszta buildnél `FAILED`-et ad a `firmware.bin` lépésnél:
 `TypeError: unsupported operand type(s) for +: '_Null' and 'str'`. Ez a PlatformIO 6.2.0 kiírásának
@@ -61,16 +62,61 @@ Az ArduinoJson-t a PlatformIO letöltéséből veszi, ezért előbb egy `pio run
 sh test/host/run.sh     # fails=0, parser fails=0, parser fails=0
 ```
 
-## 5. Upload
+## 5. Upload — macOS, lépésről lépésre
 
-```sh
-pio run -t upload
-pio device monitor       # soros napló, 115200 baud
-```
+Mért (2026-09-17, ezen a Macen, dongle nélkül): a build és az upload-parancs összeállítása. Ami a dongle
+csatlakoztatása után történik, az `⚠ [vason mérendő]`.
 
-`⚠ [vason mérendő]` A LilyGO leírása szerint (`docs/en/t-dongle-s3/REAMDE.MD`): ha a feltöltés nem
-megy, **bedugás közben tartsd nyomva a BOOT gombot** → letöltési mód. Feltöltés után húzd ki, és dugd
-vissza **gomb nélkül**, különben letöltési módban marad.
+**Előfeltételek**
+
+| Mi | Érték | Honnan |
+|---|---|---|
+| PlatformIO Core | 6.2.0 (`brew install platformio`) | mérve |
+| Feltöltő | `esptool.py` 4.9.0, a PlatformIO hozza (`tool-esptoolpy`) — külön telepíteni nem kell | mérve |
+| Driver | nem kell: az ESP32-S3 natív USB-je CDC-ként látszik | ⚠ [vason mérendő] |
+| Kábel/csatlakozó | a T-Dongle-S3 **USB-A dugó**. USB-C-s Machez USB-C → USB-A (anya) adapter kell | termék-kialakítás |
+| Baud | 921600 (`boards/dongles3.json` `upload.speed`) | mérve (`pio run -t envdump`) |
+| Flash-címek | bootloader `0x0`, partíciók `0x8000`, `boot_app0` `0xe000`, firmware `0x10000` | mérve (`envdump`) |
+
+**Lépések**
+
+1. Build (a dongle még nincs bedugva):
+   ```sh
+   cd ClaudeUsageMonitor
+   pio run                      # elvárt: [SUCCESS], 0 warning
+   ```
+2. Nézd meg, milyen soros portok vannak **bedugás előtt**:
+   ```sh
+   pio device list
+   ```
+   ⚠ Ezen a Macen már van egy idegen soros eszköz: `/dev/cu.usbserial-140` (`1A86:7523`, CH340) — az **nem** a dongle.
+3. Dugd be a dongle-t (gomb nélkül), és futtasd újra a `pio device list`-et. Az új sor a dongle.
+   Várhatóan `/dev/cu.usbmodem…`, `303A:1001` (Espressif natív USB) `⚠ [vason mérendő]`.
+4. Feltöltés **kiírt porttal**:
+   ```sh
+   pio run -t upload --upload-port /dev/cu.usbmodemXXXX
+   ```
+   Miért kell a port: a board-definíció `hwids`-e `303A:82C1`, ezt a natív USB-CDC-s firmware nem fogja mutatni.
+   Ilyenkor a PlatformIO az összes ismert board ID-jával keres (`platformio/device/finder.py`, `find()` és
+   `_find_known_device()`), és a CH340 (`1A86:7523`) is ismert ID. Így a rossz portra is tölthet.
+5. Ha a feltöltés `Failed to connect` / `No serial data received` hibával leáll → **letöltési mód** (LilyGO
+   `docs/en/t-dongle-s3/REAMDE.MD`):
+   1. húzd ki a dongle-t;
+   2. **nyomd és tartsd** a BOOT gombot, és közben dugd be;
+   3. engedd el, `pio device list` → a port neve változhat;
+   4. ismételd a 4. lépést az új porttal.
+6. A letöltési módból indított feltöltés után **húzd ki, és dugd vissza gomb nélkül**. Különben a lapka letöltési
+   módban marad, és a firmware nem indul.
+7. Soros napló:
+   ```sh
+   pio device monitor -p /dev/cu.usbmodemXXXX -b 115200
+   ```
+   Elvárt első sor: `[main] LILYGO T-Dongle-S3, firmware 0.1.0` (`src/main.cpp`). Ha nem látszik, az újraindulás
+   előtt kiírt sor elveszhetett (USB-CDC újracsatlakozik). Ilyenkor húzd ki és dugd vissza, a monitor fusson közben.
+8. Kijelző: 3 s-ig `Press BOOT now for setup mode`, utána AP-képernyő (6. szakasz).
+
+Opcionális, ha a gyári firmware maradéka zavar: `pio run -t erase --upload-port …`. Ez **törli az NVS-t is**
+(Wi-Fi/Claude-profilok, AP-jelszó).
 
 ## 6. Első indítás
 
@@ -156,6 +202,8 @@ Claude-profilonként a **Source** mezőben két út közül lehet választani (e
 
 Cél: egyszeri bejelentkezés után az eszköz **magától** frissíti a tokent, és beavatkozás nélkül fut.
 
+0. Előfeltétel: az eszköz már **otthoni Wi-Fi-n** van, van pontos idő (NTP). AP-módban nincs internet, a kódcsere
+   nem megy. Pontos idő nélkül a setup-oldal `503`-at ad; a függő login megmarad, a kód újra beküldhető.
 1. Hozz létre egy Claude-profilt `Source = OAuth`-tal (org-ID és kézi token nem kell), mentsd el.
 2. A profil sorában **Login**: az eszköz mutat egy bejelentkezési URL-t.
 3. Nyisd meg egy eszközön, ahol be vagy jelentkezve a Claude-ba, hagyd jóvá.
