@@ -101,15 +101,15 @@ static int resolveIdx(int idx, int max, bool usedFlags[]) {
 
 static void handleStatus() {
   JsonDocument doc;
-  doc["board"] = BOARD_NAME;
-  doc["firmware"] = FW_VERSION;
-  doc["adminSet"] = adminAuth.passwordSet();
-  doc["adminRequired"] = adminRequired();
-  if (!readAllowed(false)) {  // zarolva: csak annyi, amennyi a login-kepernyohoz kell
+  if (!readAllowed(false)) {  // zarolva: semmi (se tipus, se verzio) — idegen ne tudja meg, mi fut rajta
     doc["locked"] = true;
     return sendJson(200, doc);
   }
   doc["locked"] = false;
+  doc["board"] = BOARD_NAME;
+  doc["firmware"] = FW_VERSION;
+  doc["adminSet"] = adminAuth.passwordSet();
+  doc["adminRequired"] = adminRequired();
   JsonObject w = doc["wifi"].to<JsonObject>();
   w["state"] = wifiManager.stateName();
   w["ssid"] = wifiManager.staConnected() ? wifiManager.staSsid() : String("");
@@ -471,7 +471,12 @@ void WebSetup::begin() {
   static const char *headers[] = {"X-CMon", "X-CMon-Token"};
   server.collectHeaders(headers, 2);
 
-  server.on("/", HTTP_GET, [] {
+  server.on("/", HTTP_GET, [] {  // semleges login-hej; a felulet a /api/ui-rol jon, belepve
+    server.sendHeader("Cache-Control", "no-store");
+    server.send_P(200, "text/html; charset=utf-8", LOGIN_SHELL_HTML);
+  });
+  server.on("/api/ui", HTTP_GET, [] {
+    if (!guardRead()) return;
     server.sendHeader("Cache-Control", "no-store");
     server.send_P(200, "text/html; charset=utf-8", WEB_PAGE_HTML);
   });

@@ -22,15 +22,7 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
 <h1>Claude Usage Monitor</h1>
 <div class="msg" id="msg"></div>
 
-<div id="loginBox" style="display:none">
-<h2>Login</h2>
-<form onsubmit="return doLogin(event)">
-  <label>Admin password</label><input type="password" name="password" autocomplete="current-password" required>
-  <button type="submit">Login</button>
-</form>
-</div>
-
-<div id="main" style="display:none">
+<div id="main">
 <h2>Device</h2>
 <table id="dev"></table>
 <button onclick="post('/api/restart',{}).then(()=>say('Restarting...'))">Restart</button>
@@ -126,8 +118,8 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
 <script>
 const $=id=>document.getElementById(id);
 function say(t){$('msg').textContent=t}
-let token='';try{token=sessionStorage.getItem('cmonToken')||''}catch(e){}
-function setToken(t){token=t;try{t?sessionStorage.setItem('cmonToken',t):sessionStorage.removeItem('cmonToken')}catch(e){}}
+let token='';try{token=sessionStorage.getItem('sid')||''}catch(e){}
+function setToken(t){token=t;try{t?sessionStorage.setItem('sid',t):sessionStorage.removeItem('sid')}catch(e){}}
 function post(url,data){
   const body=new URLSearchParams();for(const k in data)body.append(k,data[k]);
   const h={'X-CMon':'1'};if(token)h['X-CMon-Token']=token;
@@ -136,13 +128,12 @@ function post(url,data){
     if(!j.ok)throw new Error(j.error||'error');return j}));
 }
 // Admin-jelszo eseten belepes nelkul csak a login latszik; az olvaso API-k is tokent kernek (401).
-function lock(){$('loginBox').style.display='block';$('main').style.display='none'}
-function unlock(){$('loginBox').style.display='none';$('main').style.display='block'}
+// Lejart/ervenytelen munkamenet: vissza a semleges login-hejra (/). A felulet csak belepve toltodik le.
+function lock(){setToken('');location.replace('/')}
+function unlock(){}
 function apiGet(url){const h={};if(token)h['X-CMon-Token']=token;
   return fetch(url,{headers:h,cache:'no-store'}).then(r=>{if(r.status===401){setToken('');lock();throw new Error('login required')}return r.json()})}
-function doLogin(ev){ev.preventDefault();const f=ev.target;
-  post('/api/login',{password:f.password.value}).then(j=>{setToken(j.token);f.reset();say('Logged in');unlock();load()}).catch(e=>say(e.message));return false}
-function logout(){setToken('');say('Logged out');cfg=null;lock();loadStatus()}
+function logout(){lock()}
 function saveAdmin(ev){ev.preventDefault();const f=ev.target;
   post('/api/admin',{newPassword:f.newPassword.value}).then(()=>{f.reset();setToken('');say('Admin password saved - log in again if set');loadStatus()}).catch(e=>say(e.message));return false}
 function formData(f){const d={};for(const el of f.elements){if(!el.name)continue;if(el.type==='checkbox'){if(el.checked)d[el.name]='1'}else d[el.name]=el.value}return d}
@@ -229,4 +220,31 @@ function saveTz(ev){ev.preventDefault();post('/api/timezone',{tz:$('tzStr').valu
 function saveDisplay(ev){ev.preventDefault();Promise.all([post('/api/display',{rotationSec:$('rot').value}),post('/api/refresh',{refreshSec:$('refr').value})]).then(()=>say('Saved')).catch(e=>say(e.message));return false}
 
 load();setInterval(loadStatus,5000);
+</script></body></html>)HTML";
+
+// Belepes nelkul CSAK ez megy ki a "/"-re (projektgazda, 2026-09-17: idegen ne tudja meg, mi fut az eszkozon).
+// Nincs benne termeknev, API-lista vagy felulet. Sikeres (vagy jelszo nelkuli) eleres utan a /api/ui adja a feluletet.
+static const char LOGIN_SHELL_HTML[] PROGMEM = R"HTML(<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Login</title>
+<style>body{font-family:system-ui,sans-serif;margin:0 auto;max-width:360px;padding:24px;background:#111;color:#eee}
+input,button{font-size:1em;padding:10px;margin:6px 0;width:100%;box-sizing:border-box;background:#222;color:#eee;border:1px solid #555;border-radius:4px}
+#m{min-height:1.2em;color:#fc6}</style></head><body>
+<div id="m"></div>
+<form id="f" style="display:none" onsubmit="return go(event)">
+<input type="password" id="p" autocomplete="current-password" placeholder="Password" required>
+<button type="submit">Login</button>
+</form>
+<script>
+let t='';try{t=sessionStorage.getItem('sid')||''}catch(e){}
+const m=x=>document.getElementById('m').textContent=x;
+function ui(){fetch('/api/ui',{headers:t?{'X-CMon-Token':t}:{},cache:'no-store'}).then(r=>{
+  if(r.status===200)return r.text().then(h=>{document.open();document.write(h);document.close()});
+  t='';try{sessionStorage.removeItem('sid')}catch(e){}
+  document.getElementById('f').style.display='block';document.getElementById('p').focus()}).catch(()=>m('Not reachable'))}
+function go(ev){ev.preventDefault();const b=new URLSearchParams();b.append('password',document.getElementById('p').value);
+  fetch('/api/login',{method:'POST',headers:{'X-CMon':'1'},body:b}).then(r=>r.json()).then(j=>{
+    if(!j.ok){m(j.error||'Login failed');return}
+    t=j.token;try{sessionStorage.setItem('sid',t)}catch(e){};document.getElementById('p').value='';ui()}).catch(()=>m('Not reachable'));return false}
+ui();
 </script></body></html>)HTML";

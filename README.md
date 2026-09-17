@@ -342,11 +342,15 @@ Elfelejtett admin-jelszó: forced setup (7.), abban a módban nem kell jelszó.
   megy át a helyi hálózaton vagy az AP-n.
 - **Olvasás is jelszóhoz kötött** (2026-09-17, a projektgazda kérésére), ha van admin-jelszó:
   - a `/api/config` és a `/api/scan` (GET) token nélkül `401`;
-  - a `/api/status` csak `board`, `firmware`, `adminSet`, `adminRequired` és `locked: true` mezőt ad;
-  - a weboldal belépés nélkül csak a login-mezőt mutatja;
+  - a `/api/status` zárolva csak `{"locked":true}`-t ad (se típus, se verzió);
+  - a `/` belépés nélkül egy **semleges login-héj** (1624 B, `<title>Login</title>`). Nincs benne terméknév, felirat vagy
+    API-lista; mérve, grep: `claude|monitor|lilygo|dongle|esp32|anthropic|oauth|firmware` → 0 találat.
+  - A valódi felület a `/api/ui`-ról jön, csak érvényes tokennel (token nélkül `401`);
   - az 5 s-os status-lekérdezés nem hosszabbítja a munkamenetet, így 30 perc tétlenség után lejár.
   - Mérve token nélkül: 12 módosító végpont + `config`/`scan` → `401`, rossz tokennel is `401`.
     A belépett ág a projektgazda böngészőjében mérendő.
+  - ⚠ Továbbra is elárulja az eszközt: az AP-mód SSID-je (`ClaudeMonitor-XXXX`, 7.). A Wi-Fi DHCP-hostnév
+    alapértéke ⚠ [feltárandó] (az Arduino-core-ban `esp32s3-…` lehet).
 - A hibás JSON nem okoz összeomlást: az ArduinoJson hibakódot ad, a firmware `USAGE PARSE`-t mutat.
 
 ## 15. Ismert korlátozások
