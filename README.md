@@ -222,6 +222,9 @@ RST 3d04:12:33 09.24 09:00
   - Mérve: `RST 16:49:27 @09.18 09:00`.
 - `RST PASSED @09.17 16:00`: a keret lejárt, új adatra vár.
 - `RST 09.18 09:00 (no clock)`: pontos idő nincs (NTP nélkül nincs hiteles visszaszámlálás).
+- **Felső sor:** a profilnév mindig látszik. A jobb sarokban 3 s-onként váltakozik az **IP-cím** (csak Wi-Fi-kapcsolatnál)
+  és az állapot. Az IP 90 px széles; ha a név 2-es betűvel mellette nem fér ki, az IP-fázisban kisebb betűvel, szükség
+  esetén csonkítva jelenik meg.
 - A jobb felső sarokban az adat kora (`3m OLD` sárgán, ha régebbi 2 frissítési ciklusnál), illetve `NO WIFI`,
   `NTP ERR` vagy `ERR 403`.
 

@@ -16,6 +16,7 @@ static bool fbOk = false;
 
 static const int W = 160, H = 80;
 static const uint32_t REDRAW_MS = 200;
+static const uint32_t IP_PHASE_S = 3;  // felso sor jobb sarka: 3 s IP-cim, 3 s allapot (adat kora / hiba)
 static uint32_t g_staleMs = 2UL * CLAUDE_REFRESH_DEFAULT_S * 1000UL;  // a loop() a konfiguralt periodusbol frissiti
 
 // Font 1 = 6x8 GLCD, font 2 = 16 px (platformio.ini: LOAD_GLCD, LOAD_FONT2)
@@ -135,10 +136,10 @@ void DisplayManager::drawLastKnown(const char *name, const LastKnownResets &lk) 
 
 void DisplayManager::drawProfile(int idx, const char *name) {
   ProfileUsage u = usageCache.get(idx);
-  text(name, 0, 0, TFT_CYAN, 2);  // a profilnev mindig lathato (spec 12.)
 
   // Beszedes ujra-belepes kepernyo (OAuth refresh token elhalt) — a regi adat felett is (spec 17.).
   if (u.lastError == FetchError::ReloginRequired) {
+    text(name, 0, 0, TFT_CYAN, 2);
     text("!", W, 0, TFT_RED, 2, TR_DATUM);
     text("RE-LOGIN NEEDED", W / 2, 24, TFT_RED, 2, TC_DATUM);
     text("open setup page", W / 2, 46, TFT_LIGHTGREY, 1, TC_DATUM);
@@ -146,8 +147,29 @@ void DisplayManager::drawProfile(int idx, const char *name) {
     return;
   }
 
-  // Jobb felso sarok: allapot / adat kora
   uint32_t now = millis();
+
+  // Felso sor: profilnev (mindig lathato, spec 12.) + jobb sarokban FELVALTVA az IP-cim es az allapot
+  // (projektgazda, 2026-09-17). Mert szelessegek (TFT_eSPI widtbl_f16 + 6 px/kar.): "192.168.x.x" 90 px,
+  // "xiTech" 2-es betuvel 39 px, 12 szeles karakter 120 px -> hosszu nevnel az IP-fazisban a nev kisebb betuvel,
+  // szukseg eseten csonkitva jelenik meg.
+  String ip = wifiManager.staConnected() ? wifiManager.ipString() : String();
+  bool ipPhase = ip.length() > 0 && (now / 1000) % (2 * IP_PHASE_S) < IP_PHASE_S;
+  if (ipPhase) {
+    int ipW = fb.textWidth(ip, 1);
+    if (fb.textWidth(name, 2) + 4 + ipW <= W) {
+      text(name, 0, 0, TFT_CYAN, 2);
+    } else {
+      String n = name;
+      while (n.length() && fb.textWidth(n, 1) + 4 + ipW > W) n.remove(n.length() - 1);
+      text(n, 0, 4, TFT_CYAN, 1);
+    }
+    text(ip, W, 0, TFT_LIGHTGREY, 1, TR_DATUM);
+  } else {
+    text(name, 0, 0, TFT_CYAN, 2);
+  }
+
+  // Jobb felso sarok (nem-IP fazis): allapot / adat kora
   String status;
   uint16_t sc = TFT_DARKGREY;
   if (!wifiManager.staConnected()) {
@@ -171,7 +193,7 @@ void DisplayManager::drawProfile(int idx, const char *name) {
       text(age, W, 9, TFT_YELLOW, 1, TR_DATUM);  // hiba mellett is latszodjon az adat kora (spec 18.)
     }
   }
-  if (status.length()) text(status, W, 0, sc, 1, TR_DATUM);
+  if (status.length() && !ipPhase) text(status, W, 0, sc, 1, TR_DATUM);
 
   if (!u.hasData) {
     // Nincs friss adat, de van mentett reset-idopont: azt mutatjuk "waiting WiFi"/hiba helyett.
