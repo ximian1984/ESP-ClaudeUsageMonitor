@@ -177,15 +177,19 @@ Választás induláskor és kapcsolatvesztéskor:
 1. scan;
 2. az engedélyezett profilok közül azok, amelyek látszanak;
 3. prioritás szerint csökkenő sorrend, azonos prioritásnál az erősebb jel (RSSI);
-4. sorban próbálja, jelöltenként 15 s-ig;
+4. sorban próbálja, jelöltenként legfeljebb 15 s-ig. **Rossz jelszónál nem várja ki**: a Wi-Fi-driver bontási okából
+   (pl. `15 4WAY_HANDSHAKE_TIMEOUT`, `202 AUTH_FAIL`) felismeri, és lép a következőre. Mérve: rossz jelszó → 5,3 s.
 5. ha egyik sem megy → AP fallback.
+
+Mentés/törlés a setup-oldalon csak akkor bontja a meglévő kapcsolatot, ha az a **mostani** hálózatot érinti. Egy újonnan
+felvett, nagyobb prioritású hálózatra az eszköz a következő kapcsolatvesztéskor vált. A scan ~6,5 s (mérve).
 
 Szerkesztésnél az üresen hagyott jelszómező megtartja a tároltat. Nyílt hálózathoz pipáld be a
 „clear stored password" jelölőt.
 
 ## 9. Több Claude profil
 
-Legfeljebb **5** profil: név (max. 12 karakter, a kijelzőn mindig látszik), Source (OAuth vagy claude.ai web,
+Legfeljebb **5** profil: név (max. 12 karakter, a kijelzőn mindig látszik; üresen hagyva `Profile-XX`, ahol XX véletlen 00–99, ütközés nélkül), Source (OAuth vagy claude.ai web,
 lásd 11.), engedélyezve. OAuth-nál a tokent a bejelentkezés adja; web-nél Organization ID + sessionKey.
 
 - Minden profil saját cache-t kap. Hiba esetén az utolsó érvényes adat megmarad, és a kijelző mutatja a korát.
@@ -205,16 +209,36 @@ rotációnál is a beállított frissítési idő marad. A „Claude requests si
 Kijelző-elrendezés:
 
 ```
-SZILARD                    12s
+xiTech                     12s
 SESSION             73% LEFT
 [██████████████░░░░░░░░░░░░░]
-RESET 02:17:32 @14:30
+RST 04:49:27 @09.17 21:00
 WEEKLY              59% LEFT
-RESET 3d04h12m @Mon 09:00
+RST 3d04:12:33 09.24 09:00
 ```
 
-A jobb felső sarokban az adat kora (`3m OLD` sárgán, ha régebbi 2 percnél), illetve `NO WIFI`,
-`NTP ERR` vagy `ERR 403`. Ha a reset ideje lejárt, `RESET PASSED` jelenik meg, nem hamis visszaszámlálás.
+- **Reset-sor:** hátralévő idő másodpercre járva, utána a reset **hó.nap óra:perc**-e helyi időben.
+  - A kijelző 26 karakter széles. Napos visszaszámlálásnál a `@` elmarad, különben nem férne ki.
+  - Mérve: `RST 16:49:27 @09.18 09:00`.
+- `RST PASSED @09.17 16:00`: a keret lejárt, új adatra vár.
+- `RST 09.18 09:00 (no clock)`: pontos idő nincs (NTP nélkül nincs hiteles visszaszámlálás).
+- A jobb felső sarokban az adat kora (`3m OLD` sárgán, ha régebbi 2 frissítési ciklusnál), illetve `NO WIFI`,
+  `NTP ERR` vagy `ERR 403`.
+
+**Wi-Fi nélkül — utolsó ismert resetek:**
+- Minden sikeres lekérés után a session- és a heti reset időpontja NVS-be kerül (namespace `cmonlk`, csak időpontok,
+  titok nincs). Így újraindítás után is megvan.
+- Ha nincs Wi-Fi vagy friss adat, a kijelzőn `SESSION (last known)` / `WEEKLY (last known)` + a reset-sor, és
+  `data from MM-DD HH:MM` látszik.
+- AP-fallbackban ez a nézet a setup-képernyővel váltakozik.
+- A mentett időpontokat a firmware törli, ha a profilhoz más fiókkal lépsz be, vagy a profilt törlöd.
+- ⚠ A Wi-Fi nélküli képernyőt vason még senki nem nézte meg; a mentés és a visszatöltés mérve van.
+
+**Időzóna** (setup-oldal, *Time zone*): lista a gyakori zónákkal, vagy egyedi POSIX TZ-string. NVS-ben, alap
+`CET-1CEST,M3.5.0,M10.5.0/3` (Budapest). A listaértékek a `/usr/share/zoneinfo/<zóna>` utolsó sorából vannak.
+Vason mérve (newlib), UTC 13:54-kor: `JST-9` → 22:54, `<+04>-4` → 17:54, `IST-5:30` → 19:24, `EST5EDT…` → 09:54.
+A `/api/status` `localTime`/`tz` mezője, és Claude-profilonként a `sessionReset`/`weeklyReset` szó szerint azt adja,
+ami a kijelzőn van.
 
 ## 11. Claude authentication
 
@@ -226,10 +250,11 @@ Cél: egyszeri bejelentkezés után az eszköz **magától** frissíti a tokent,
 
 0. Előfeltétel: az eszköz már **otthoni Wi-Fi-n** van, van pontos idő (NTP). AP-módban nincs internet, a kódcsere
    nem megy. Pontos idő nélkül a setup-oldal `503`-at ad; a függő login megmarad, a kód újra beküldhető.
-1. Hozz létre egy Claude-profilt `Source = OAuth`-tal (org-ID és kézi token nem kell), mentsd el.
-2. A profil sorában **Login**: az eszköz mutat egy bejelentkezési URL-t.
-3. Nyisd meg egy eszközön, ahol be vagy jelentkezve a Claude-ba, hagyd jóvá.
-4. A megjelenő oldal ad egy kódot (`code#state` alak). Másold be a setup-oldalra.
+1. A Claude-profil űrlapon (név elhagyható, `Source = OAuth`) nyomd meg a zöld **Authenticate now** gombot.
+   Ez menti a profilt, és új fülön megnyitja a Claude jóváhagyó oldalát. Meglévő profilnál a sor **Authenticate** gombja.
+2. Hagyd jóvá (olyan böngészőben, ahol be vagy jelentkezve a Claude-ba).
+3. A megjelenő oldal ad egy kódot (`code#state` alak). Másold be az oldal alján megjelenő mezőbe → **Submit code**.
+   Ha az új fül nem nyílt meg (popup-tiltás): **Open Claude sign-in page**.
 5. Az eszköz tokenre cseréli, NVS-be írja, és onnantól **5 perccel lejárat előtt automatikusan frissít**.
 
 - **Dedikált token:** a saját bejelentkezésed külön tokent ad, ezért nem ütközik a gépeden futó Claude Code-dal.
@@ -245,8 +270,11 @@ választ még nem mértük.
 A tárolt titkok (access/refresh token, sessionKey) soha nem jelennek meg újra: a setup-oldal csak az állapotot
 mutatja (nincs bejelentkezve / token, lejárat / set). NVS-ben tárolva, nem logolva, a kijelzőn nem látszanak.
 
-⚠ **[vason mérendő]** a teljes bejelentkezési és frissítési folyamat (dedikált tokennel); hogy a callback-oldal
-`code#state` alakban ad-e kódot; a frissítő token élettartama.
+✅ **Vason mérve (2026-09-17):**
+- a login a projektgazda fiókjával sikerült (`code#state` kód), az első usage-lekérés `HTTP 200`, 2326 B, `limits[]` 3 limit;
+- újraindítás után a tokenek megmaradtak, a lekérés újra `200` volt.
+
+⚠ Még nem mért: az automatikus token-frissítés (~8 óra után), és a frissítő token élettartama.
 
 ⚠ Az eszköz a Claude Code OAuth-kliensazonosítójával lép fel. Ez nem harmadik félnek szánt API; az Anthropic
 feltételei szerint kifogásolható lehet. Személyes, saját usage-figyelésre, a projektgazda vállalásával.

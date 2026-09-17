@@ -23,7 +23,7 @@ class TimeManager {
   static String localHHMM(time_t t);
   // "3d04:12:33" / "02:17:32" formatum (masodpercre jar); "--" ha nem pozitiv.
   static String formatRemaining(long seconds);
-  // A kijelzo reset-szovege, pl. "IN 02:17:32 @09.17 18:40" (helyi idoben, mindig datummal, max. 26 karakter).
+  // A kijelzo reset-szovege, pl. "RST 02:17:32 @09.17 18:40" / "RST 3d04:12:33 09.24 09:00" (helyi idoben, mindig datummal, max. 26 karakter).
   static String resetText(time_t resetAt, bool synced, time_t now);
 
   // ISO-8601 UTC idobelyeg -> epoch. Elfogad: "YYYY-MM-DDTHH:MM:SS[.fff](Z|+HH:MM|-HH:MM)".

@@ -40,10 +40,10 @@ int main(){
   setenv("TZ","GMT0BST,M3.5.0/1,M10.5.0",1); tzset(); CHECK(TimeManager::localDateTime(1768000000)=="2026-01-09 23:06");  // Europe/London
   setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1); tzset();
   // 1789579157 = 2026-09-16T17:19:17Z = 19:19 helyi (CEST)
-  CHECK(TimeManager::resetText(1789579157, true, 1789579157-8252)=="IN 02:17:32 @09.16 19:19");
-  CHECK(TimeManager::resetText(1789579157, true, 1789579157-(3*86400+4*3600))=="IN 3d04:00:00 @09.16 19:19");
-  CHECK(TimeManager::resetText(1789579157, true, 1789579157+5)=="PASSED @09.16 19:19");
-  CHECK(TimeManager::resetText(1789579157, false, 0)=="AT 09.16 19:19 (no clock)");
+  CHECK(TimeManager::resetText(1789579157, true, 1789579157-8252)=="RST 02:17:32 @09.16 19:19");
+  CHECK(TimeManager::resetText(1789579157, true, 1789579157-(3*86400+4*3600))=="RST 3d04:00:00 09.16 19:19");
+  CHECK(TimeManager::resetText(1789579157, true, 1789579157+5)=="RST PASSED @09.16 19:19");
+  CHECK(TimeManager::resetText(1789579157, false, 0)=="RST 09.16 19:19 (no clock)");
   CHECK(TimeManager::validPosixTz("CET-1CEST,M3.5.0,M10.5.0/3"));
   CHECK(TimeManager::validPosixTz("<+04>-4"));
   CHECK(!TimeManager::validPosixTz("CE"));
@@ -51,5 +51,6 @@ int main(){
   CHECK(!TimeManager::validPosixTz("CET\"-1"));
   CHECK(!TimeManager::validPosixTz(nullptr));
   CHECK(TimeManager::resetText(1789579157+6*86400, true, 1789579157-(3600*23+59*60+59)).length()<=26);  // 160 px
+  CHECK(TimeManager::resetText(1789579157+30*86400, true, 1789579157).length()<=26);  // 2 jegyu nap
   printf("fails=%d\n",fails); return fails;
 }

@@ -67,11 +67,19 @@ String TimeManager::resetText(time_t resetAt, bool synced, time_t now) {
   localtime_r(&t, &lt);
   char when[16];
   strftime(when, sizeof(when), "%m.%d %H:%M", &lt);  // HH.NN oo:pp — az ev nem fer ki, es nem is kell
-  // 160 px / 6 px = 26 karakter. "IN 3d04:12:33 @09.24 09:00" = 26 — a leghosszabb eset is kifer.
-  if (!synced) return String("AT ") + when + " (no clock)";  // pontos ido nelkul nincs visszaszamlalas
+  // 160 px / 6 px = 26 karakter. "RST 16:56:54 @09.18 09:00" = 25 kifer; napos alakban a "@" nelkul
+  // ("RST 3d04:12:33 09.24 09:00" = 26), kulonben 27 karakter lenne es levagodna (projektgazda: RST, 2026-09-17).
+  if (!synced) return String("RST ") + when + " (no clock)";  // pontos ido nelkul nincs visszaszamlalas
   long secs = (long)(resetAt - now);
-  if (secs <= 0) return String("PASSED @") + when;
-  return "IN " + formatRemaining(secs) + " @" + when;
+  if (secs <= 0) return String("RST PASSED @") + when;
+  String s = "RST " + formatRemaining(secs) + " @" + when;
+  if (s.length() > 26) s = "RST " + formatRemaining(secs) + " " + when;
+  if (s.length() > 26) {  // >= 10 nap (tartalek; a valos keretek legfeljebb 7 naposak)
+    char dh[16];
+    snprintf(dh, sizeof(dh), "%ldd%02ldh", secs / 86400, (secs % 86400) / 3600);
+    s = String("RST ") + dh + " " + when;
+  }
+  return s;
 }
 
 String TimeManager::formatRemaining(long s) {

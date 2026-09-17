@@ -72,7 +72,7 @@ void DisplayManager::drawNoProfiles() {
   text("http://" + wifiManager.ipString(), 0, 56, TFT_CYAN);
 }
 
-// Egy limit ket sora: "LABEL   73% LEFT" + (opcionalis savval) "IN 02:17:32 @09.17 18:40" / "IN 3d04:12:33 @09.24 09:00"
+// Egy limit ket sora: "LABEL   73% LEFT" + (opcionalis savval) "RST 02:17:32 @09.17 18:40" / "RST 3d04:12:33 09.24 09:00"
 // Az ido a beallitott idozonaban (setup-oldal, NVS "tz").
 static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, bool bar, bool dataStale) {
   uint16_t valColor = dataStale ? TFT_DARKGREY : TFT_WHITE;
@@ -105,7 +105,7 @@ static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, boo
   if (!l->hasReset) {
     text("RESET n/a", 0, ry, TFT_DARKGREY);
   } else {
-    // Mindig datummal: "IN 02:17:32 @09.17 18:40" (projektgazda, 2026-09-17). NTP nelkul "@... ?", lejartan PASSED.
+    // Mindig datummal: "RST 02:17:32 @09.17 18:40" (projektgazda, 2026-09-17). NTP nelkul "@... ?", lejartan PASSED.
     uint16_t c = !timeManager.synced() ? TFT_RED : resetPassed ? TFT_DARKGREY : TFT_WHITE;
     text(TimeManager::resetText(l->resetAt, timeManager.synced(), now), 0, ry, c);
   }
@@ -119,7 +119,7 @@ static void lkBlock(const char *label, time_t reset, int y) {
     text("n/a", W, y, TFT_DARKGREY, 1, TR_DATUM);
     return;
   }
-  // "IN 3d04:12:33 @09.24 09:00" a cimke alatt (egy sorba cimkevel nem ferne ki)
+  // "RST 3d04:12:33 09.24 09:00" a cimke alatt (egy sorba cimkevel nem ferne ki)
   text(TimeManager::resetText(reset, timeManager.synced(), timeManager.now()), 0, y + 9, TFT_WHITE);
 }
 
