@@ -252,6 +252,33 @@ ClaudeBrief ConfigManager::brief() {
   return b;
 }
 
+bool ConfigManager::saveProviderLogin(int idx, uint32_t editSeq, const char *refreshTok, const char *orgId,
+                                      const char *scope) {
+  if (idx < 0 || idx >= MAX_CLAUDE_PROFILES || !refreshTok || !refreshTok[0]) return false;
+  if (strlen(refreshTok) > CLAUDE_REFRESH_MAX) return false;
+  Lock l(_mtx);
+  ClaudeProfile &c = _cfg.claude[idx];
+  if (!c.used || c.editSeq != editSeq) return false;
+  Preferences p;
+  p.begin(NS, false);
+  bool ok = true;
+  if (strcmp(refreshTok, c.refresh) != 0) {  // rotalt refresh token: azonnal perzisztal
+    ok = p.putString(key('c', idx, "rt").c_str(), refreshTok) > 0;
+    if (ok) strlcpy(c.refresh, refreshTok, sizeof(c.refresh));
+  }
+  if (ok && orgId && strcmp(orgId, c.orgId) != 0 && strlen(orgId) <= CLAUDE_ORG_MAX) {
+    p.putString(key('c', idx, "org").c_str(), orgId);
+    strlcpy(c.orgId, orgId, sizeof(c.orgId));
+  }
+  if (ok && scope && scope[0] && strlen(scope) <= CLAUDE_SCOPE_MAX && strcmp(scope, c.scope) != 0) {
+    p.putString(key('c', idx, "sc").c_str(), scope);
+    strlcpy(c.scope, scope, sizeof(c.scope));
+  }
+  p.end();
+  _version++;
+  return ok;
+}
+
 bool ConfigManager::saveOAuthTokens(int idx, uint32_t editSeq, const char *access, const char *refreshTok,
                                     uint32_t expiresAt, const char *scope) {
   if (idx < 0 || idx >= MAX_CLAUDE_PROFILES || !access || !access[0]) return false;

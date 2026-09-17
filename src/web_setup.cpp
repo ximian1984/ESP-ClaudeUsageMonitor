@@ -12,6 +12,8 @@
 #include "config.h"
 #include "config_manager.h"
 #include "oauth_client.h"
+#include "provider_auth.h"
+#include "token_cache.h"
 #include "refresh_scheduler.h"
 #include "time_manager.h"
 #include "usage_cache.h"
@@ -283,7 +285,10 @@ static void handleClaudeSave() {
   org.trim();
   if (transportNeedsOrgId((ClaudeTransport)transport) && !isValidOrgId(org.c_str()))
     return sendError(400, "Organization ID must be a UUID");
-  if (!org.isEmpty() && !isValidOrgId(org.c_str())) return sendError(400, "Organization ID must be a UUID or empty");
+  // Csak a Claude web-utnal kerul az urlapbol; a tobbi forrasnal a login adja (lent megtartjuk), az urlap erteket
+  // nem validaljuk (az Enable/Disable gomb pl. a Gemini project-ID-t kuldi vissza).
+  if (transport == (int)ClaudeTransport::WebSession && !org.isEmpty() && !isValidOrgId(org.c_str()))
+    return sendError(400, "Organization ID must be a UUID or empty");
 
   ClaudeProfile p = cfg.claude[idx];
   bool transportChanged = p.used && p.transport != transport;
@@ -293,9 +298,11 @@ static void handleClaudeSave() {
   }
   p.transport = (uint8_t)transport;
 
-  if (transport == (int)ClaudeTransport::OAuth) {
-    // OAuth: a tokeneket NEM ez a form adja, hanem az on-device login (handleOAuthFinish).
-    // Itt csak nev/engedelyezes/uj-profil. A meglevo tokenek megmaradnak (p a snapshotbol jott).
+  if (providerIsOAuth((ClaudeTransport)transport)) {
+    // OAuth-jellegu forras (Claude/Gemini/ChatGPT/Grok): a tokeneket NEM ez a form adja, hanem a login.
+    // Itt csak nev/engedelyezes/uj-profil. A meglevo tokenek es az account-/project-ID megmaradnak (p a snapshotbol).
+    if (transportChanged || !p.used) p.orgId[0] = '\0';
+    else org = p.orgId;
   } else {
     // WebSession: sessionKey kezi megadasa.
     if (!p.used || transportChanged || argBool("changeAuth")) {
@@ -320,68 +327,141 @@ static void handleClaudeSave() {
   sendJson(200, doc);
 }
 
-// --- OAuth on-device login (PKCE) ---
+// --- On-device login (Claude/Gemini: kodmasolas; ChatGPT/Grok: eszkozkod) ---
 // Egyszerre egy fuggoben levo login (egy admin egy eszkozt allit be). Csak RAM-ban.
-static struct {
-  bool active = false;
-  int idx = -1;
-  uint32_t editSeq = 0;
-  uint32_t startedMs = 0;
-  String verifier;
-  String state;
-} g_login;
+static PendingLogin g_login;
+
+static void finishLoginFailed(const String &err, int code = 400) {
+  Serial.printf("[web] login hiba: %s\n", err.c_str());
+  sendError(code, err.length() ? err.c_str() : "login failed");
+}
+
+// Sikeres token-valasz mentese szolgaltatonkent. true = kesz.
+static bool storeLoginTokens(const ProviderTokens &t, String &err) {
+  int idx = g_login.idx;
+  ClaudeTransport tr = g_login.transport;
+  if (tr == ClaudeTransport::OAuth) {
+    uint32_t exp = t.expiresIn ? (uint32_t)(timeManager.now() + t.expiresIn) : 0;
+    if (!configManager.saveOAuthTokens(idx, g_login.editSeq, t.access.c_str(), t.refresh.c_str(), exp, t.scope.c_str())) {
+      err = "profile changed during login, try again";
+      return false;
+    }
+  } else {
+    String orgId = t.accountId;  // ChatGPT: account-ID az id_token-bol
+    if (tr == ClaudeTransport::Gemini) {
+      String perr;
+      orgId = geminiLoadProject(t.access, perr);  // ures is lehet: a scheduler kesobb ujraprobalja
+      if (orgId.isEmpty()) Serial.printf("[web] gemini project: %s\n", perr.c_str());
+    }
+    if (!configManager.saveProviderLogin(idx, g_login.editSeq, t.refresh.c_str(), orgId.length() ? orgId.c_str() : nullptr,
+                                         t.scope.c_str())) {
+      err = t.refresh.length() > CLAUDE_REFRESH_MAX ? "refresh token too long for this firmware" : "profile changed during login, try again";
+      return false;
+    }
+    tokenCache.set(idx, t.access, timeManager.now() + (time_t)(t.expiresIn ? t.expiresIn : PROVIDER_ACCESS_DEFAULT_TTL_S));
+  }
+  usageCache.forgetLastKnown(idx);  // uj bejelentkezes: lehet masik fiok
+  return true;
+}
 
 static void handleOAuthStart() {
   if (!guardPost()) return;
   int idx = argInt("idx", -1);
   if (idx < 0 || idx >= MAX_CLAUDE_PROFILES) return sendError(400, "bad idx");
   auto cfgHeap = configManager.heapSnapshot();
-  DeviceConfig &cfg = *cfgHeap;
-  if (!cfg.claude[idx].used || cfg.claude[idx].transport != (uint8_t)ClaudeTransport::OAuth)
-    return sendError(400, "not an OAuth profile");
-  OAuthLogin lg;
-  if (!oauthBeginLogin(lg)) return sendError(500, "PKCE init failed");
-  g_login.active = true;
-  g_login.idx = idx;
-  g_login.editSeq = cfg.claude[idx].editSeq;
-  g_login.startedMs = millis();
-  g_login.verifier = lg.verifier;
-  g_login.state = lg.state;
+  const ClaudeProfile &c = cfgHeap->claude[idx];
+  ClaudeTransport tr = (ClaudeTransport)c.transport;
+  if (!c.used || !providerIsOAuth(tr)) return sendError(400, "not an OAuth profile");
+  // Eszkozkodnal mar az inditas is HTTPS-keres (TLS -> pontos ido kell).
+  PendingLogin lg;
+  String err;
+  if (!timeManager.synced() && (tr == ClaudeTransport::ChatGpt || tr == ClaudeTransport::Grok))
+    return sendError(503, "no internet time yet (connect Wi-Fi, wait for NTP), then retry");
+  if (!providerBeginLogin(tr, lg, err)) return finishLoginFailed(err, 502);
+  lg.active = true;
+  lg.idx = idx;
+  lg.editSeq = c.editSeq;
+  lg.startedMs = millis();
+  g_login = lg;
   JsonDocument doc;
   doc["ok"] = true;
-  doc["authorizeUrl"] = lg.authorizeUrl;  // NEM titok; a verifier/state a RAM-ban marad
+  doc["provider"] = providerLabel(tr);
+  doc["mode"] = lg.mode == LoginMode::Device ? "device" : "code";
+  doc["url"] = lg.url;                // NEM titok
+  doc["authorizeUrl"] = lg.url;       // regi feluletnek
+  if (lg.mode == LoginMode::Device) {
+    doc["userCode"] = lg.userCode;    // a felhasznalonak mutatando kod (nem titok)
+    doc["interval"] = lg.intervalS;
+    doc["expiresIn"] = lg.expiresS;
+  } else {
+    doc["codeFormat"] = tr == ClaudeTransport::OAuth ? "code#state" : "code";
+  }
   sendJson(200, doc);
+}
+
+static bool loginValid(int idx, LoginMode mode) {
+  if (!g_login.active || g_login.idx != idx || g_login.mode != mode) {
+    sendError(400, "no pending login for this profile");
+    return false;
+  }
+  uint32_t ttl = mode == LoginMode::Device ? g_login.expiresS * 1000UL : OAUTH_LOGIN_TTL_MS;
+  if (millis() - g_login.startedMs > ttl) {
+    g_login.clear();
+    sendError(408, "login expired, start again");
+    return false;
+  }
+  return true;
 }
 
 static void handleOAuthFinish() {
   if (!guardPost()) return;
   int idx = argInt("idx", -1);
-  if (!g_login.active || g_login.idx != idx) return sendError(400, "no pending login for this profile");
-  if (millis() - g_login.startedMs > OAUTH_LOGIN_TTL_MS) {
-    g_login.active = false;
-    return sendError(408, "login expired, start again");
-  }
+  if (!loginValid(idx, LoginMode::CodePaste)) return;
   String code = server.arg("code");
   code.trim();
-  if (code.isEmpty()) return sendError(400, "paste the code#state value");
+  if (code.isEmpty()) return sendError(400, "paste the code from the sign-in page");
   // Pontos ido nelkul a TLS-tanusitvany ervenyessege nem ellenorizheto, es a lejarat (now + expires_in) is hamis lenne.
   // A login ezert csak Wi-Fi (STA) + NTP utan mehet; a pending login (verifier/state) megmarad, ujra bekuldheto.
   if (!timeManager.synced()) return sendError(503, "no internet time yet (connect Wi-Fi, wait for NTP), then resubmit");
-  // Blokkolo (TLS + kodcsere) — a felhasznalo varja; a setup-oldal addig is fut.
-  OAuthTokens t = oauthExchangeCode(code, g_login.verifier, g_login.state);
-  if (!t.ok) {
-    // A hibaszoveg beszedes (pl. "state mismatch", "400 invalid_grant"), titkot nem tartalmaz.
-    return sendError(400, t.error.length() ? t.error.c_str() : "token exchange failed");
-  }
-  uint32_t exp = t.expiresIn ? (uint32_t)(timeManager.now() + t.expiresIn) : 0;
-  bool ok = configManager.saveOAuthTokens(idx, g_login.editSeq, t.access.c_str(), t.refresh.c_str(), exp,
-                                          t.scope.c_str());
-  g_login.active = false;
-  g_login.verifier = "";  // titok torlese a RAM-bol
-  g_login.state = "";
-  if (!ok) return sendError(409, "profile changed during login, try again");
-  usageCache.forgetLastKnown(idx);  // uj bejelentkezes: lehet masik fiok
+  ProviderTokens t = providerFinishCode(g_login, code);  // blokkolo (TLS + kodcsere)
+  if (!t.ok) return finishLoginFailed(t.error.length() ? t.error : String("token exchange failed"));
+  String err;
+  bool ok = storeLoginTokens(t, err);
+  g_login.clear();  // titok (verifier/state) torlese a RAM-bol
+  if (!ok) return finishLoginFailed(err, 409);
   sendOk();
+}
+
+// Eszkozkod: a felulet a kapott interval szerint hivja; egy hivas = legfeljebb egy lekerdezes.
+static void handleOAuthPoll() {
+  if (!guardPost()) return;
+  int idx = argInt("idx", -1);
+  if (!loginValid(idx, LoginMode::Device)) return;
+  JsonDocument doc;
+  doc["ok"] = true;
+  if (millis() - g_login.lastPollMs < g_login.intervalS * 1000UL) {  // a szolgaltato slow_down-t adna
+    doc["status"] = "pending";
+    return sendJson(200, doc);
+  }
+  g_login.lastPollMs = millis();
+  ProviderTokens t = providerPollDevice(g_login);
+  if (t.pending) {
+    if (t.slowDown) g_login.intervalS += 5;  // RFC 8628 3.5
+    doc["status"] = "pending";
+    doc["interval"] = g_login.intervalS;
+    return sendJson(200, doc);
+  }
+  if (!t.ok) {
+    String e = t.error.length() ? t.error : String("device login failed");
+    g_login.clear();
+    return finishLoginFailed(e);
+  }
+  String err;
+  bool ok = storeLoginTokens(t, err);
+  g_login.clear();
+  if (!ok) return finishLoginFailed(err, 409);
+  doc["status"] = "done";
+  sendJson(200, doc);
 }
 
 static void handleClaudeDelete() {
@@ -556,10 +636,10 @@ static void handleExportEncrypted() {
   sendJson(200, env);
 }
 
-static bool tokenString(const char *s) {  // fejlecbe kerul: lathato ASCII, szokoz/;/, nelkul
+static bool tokenString(const char *s, size_t maxLen) {  // fejlecbe kerul: lathato ASCII, szokoz/;/, nelkul
   if (!s) return false;
   size_t n = strlen(s);
-  if (n > CLAUDE_AUTH_MAX) return false;
+  if (n > maxLen) return false;
   for (size_t i = 0; i < n; i++)
     if (s[i] <= 0x20 || s[i] > 0x7E || s[i] == ';' || s[i] == ',') return false;
   return true;
@@ -640,8 +720,10 @@ static void handleImport() {
       if (tr == transportName((ClaudeTransport)t)) transport = t;
     if (transport < 0) return sendError(400, "Claude: transport must be oauth or web-session");
     const char *org = o["orgId"] | "";
-    if (org[0] ? !isValidOrgId(org) : transportNeedsOrgId((ClaudeTransport)transport))
-      return sendError(400, "Claude: Organization ID must be a UUID");
+    // WebSession: org-UUID kotelezo; a tobbi forrasnal az orgId a login altal adott account-/project-ID.
+    if (transport == (int)ClaudeTransport::WebSession && !isValidOrgId(org))
+      return sendError(400, "Claude web: Organization ID must be a UUID");
+    if (strlen(org) > CLAUDE_ORG_MAX || !printableAscii(String(org), false)) return sendError(400, "profile: invalid orgId");
     c.used = true;
     c.enabled = o["enabled"] | true;
     c.transport = (uint8_t)transport;
@@ -649,7 +731,8 @@ static void handleImport() {
     strlcpy(c.orgId, org, sizeof(c.orgId));
     if (o["auth"].is<const char *>() || o["refresh"].is<const char *>()) {
       const char *a = o["auth"] | "", *r = o["refresh"] | "", *sc = o["scope"] | "";
-      if (!tokenString(a) || !tokenString(r) || strlen(sc) > CLAUDE_SCOPE_MAX) return sendError(400, "Claude: invalid token field");
+      if (!tokenString(a, CLAUDE_AUTH_MAX) || !tokenString(r, CLAUDE_REFRESH_MAX) || strlen(sc) > CLAUDE_SCOPE_MAX)
+        return sendError(400, "profile: invalid token field");
       strlcpy(c.auth, a, sizeof(c.auth));
       strlcpy(c.refresh, r, sizeof(c.refresh));
       strlcpy(c.scope, sc, sizeof(c.scope));
@@ -738,6 +821,7 @@ void WebSetup::begin() {
   server.on("/api/refresh", HTTP_POST, handleRefresh);
   server.on("/api/oauth/start", HTTP_POST, handleOAuthStart);
   server.on("/api/oauth/finish", HTTP_POST, handleOAuthFinish);
+  server.on("/api/oauth/poll", HTTP_POST, handleOAuthPoll);
   server.on("/api/scan", HTTP_POST, handleScanStart);
   server.on("/api/scan", HTTP_GET, handleScanResults);
   server.on("/api/restart", HTTP_POST, handleRestart);

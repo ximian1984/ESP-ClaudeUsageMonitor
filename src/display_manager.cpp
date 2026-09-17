@@ -217,7 +217,9 @@ void DisplayManager::drawProfile(int idx, const char *name) {
 
   // Layout (y): 0 nev | 16 SESSION + sav 32..37 | 40 reset | 50 WEEKLY | 67 reset
   drawLimit(u.data.find(LimitKind::Session), "SESSION", 16, true, stale);
-  drawLimit(u.data.find(LimitKind::Weekly), "WEEKLY", 50, false, stale);
+  // Egyetlen limitet ado szolgaltatonal (pl. Grok CREDITS) ne legyen ures "WEEKLY n/a" blokk.
+  if (u.data.find(LimitKind::Weekly) || u.data.count != 1)
+    drawLimit(u.data.find(LimitKind::Weekly), "WEEKLY", 50, false, stale);
 }
 
 void DisplayManager::loop() {

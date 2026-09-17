@@ -103,13 +103,13 @@ int main() {
 #ifndef EXPECT_GATE_CLOSED
   CHECK(USAGE_PARSER_ENABLE == 1);  // alapbuildben a kapu NYITVA (az alak valos mintaval igazolt)
 #endif
-  FetchError g = parseUsage(String(real.c_str()), d);
+  FetchError g = parseUsage(ClaudeTransport::OAuth, String(real.c_str()), d);
 #if USAGE_PARSER_ENABLE == 0
   CHECK(g == FetchError::ParserPending && d.count == 0);
 #else
   CHECK(g == FetchError::None && d.count == 3);
 #endif
-  CHECK(parseUsage(String("garbage"), d) == FetchError::Parse);
+  CHECK(parseUsage(ClaudeTransport::OAuth, String("garbage"), d) == FetchError::Parse);
 
   printf("parser fails=%d\n", fails);
   return fails;

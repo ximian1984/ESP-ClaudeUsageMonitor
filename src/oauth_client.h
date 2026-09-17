@@ -19,6 +19,11 @@ struct OAuthTokens {
   bool invalidGrant = false;  // a refresh/login token vegleg ervenytelen -> ujra-belepes kell
 };
 
+// Kozos PKCE-segedek (a tobbi szolgaltato is hasznalja, provider_auth.cpp).
+String randomBase64url(size_t nbytes);          // esp_fill_random -> base64url
+String pkceChallenge(const String &verifier);  // base64url(SHA-256(verifier))
+String urlEncode(const String &s);
+
 // PKCE-login inditasa: verifier+state+challenge generalas, authorize URL osszeallitasa.
 // A challenge = base64url(SHA-256(verifier)). Vason ellenorizve az RFC 7636 B. vektorral (PLAN 2.9).
 bool oauthBeginLogin(OAuthLogin &out);

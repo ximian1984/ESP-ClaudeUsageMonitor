@@ -118,15 +118,151 @@ FetchError parseUsageUngated(const char *body, size_t len, UsageData &out, Usage
   return FetchError::None;
 }
 
-FetchError parseUsage(const String &body, UsageData &out) {
+// ---------------------------------------------------------------------------------------------
+// Uj szolgaltatok
+// ---------------------------------------------------------------------------------------------
+
+// Kijelzo-helyre tesz: az elso ket limit a Session/Weekly "slot" (a kijelzo ezt a ketto rajzolja), a tobbi Other.
+static void pushSlot(UsageData &out, UsageLimit l) {
+  if (!out.find(LimitKind::Session)) l.kind = LimitKind::Session;
+  else if (!out.find(LimitKind::Weekly)) l.kind = LimitKind::Weekly;
+  else l.kind = LimitKind::Other;
+  push(out, l);
+}
+
+// "gemini-2.5-pro" -> "2.5 PRO"; tul hosszu -> vagva (a cimke 11 karakter).
+static void geminiLabel(char *dst, size_t n, const char *modelId) {
+  const char *m = modelId ? modelId : "";
+  if (!strncmp(m, "gemini-", 7)) m += 7;
+  upperLabel(dst, n, "", m);
+  for (char *p = dst; *p; p++)
+    if (*p == '-') *p = ' ';
+}
+
+static int geminiRank(const char *modelId) {  // stabil sorrend: pro elore, aztan flash, aztan a tobbi
+  if (!modelId) return 9;
+  if (strstr(modelId, "pro")) return 0;
+  if (strstr(modelId, "flash")) return 1;
+  return 2;
+}
+
+static void fromGemini(JsonObjectConst root, UsageData &out) {
+  JsonArrayConst buckets = root["buckets"].as<JsonArrayConst>();
+  // Ket menet a stabil sorrendhez (rank 0..2); bucketonkent egy limit.
+  for (int rank = 0; rank <= 2; rank++) {
+    for (JsonObjectConst b : buckets) {
+      const char *model = b["modelId"].is<const char *>() ? b["modelId"].as<const char *>() : nullptr;
+      if (geminiRank(model) != rank) continue;
+      UsageLimit l;
+      geminiLabel(l.label, sizeof(l.label), model ? model : "QUOTA");
+      if (b["remainingFraction"].is<float>()) {
+        float rem = b["remainingFraction"].as<float>();
+        if (rem < 0) rem = 0;
+        if (rem > 1) rem = 1;
+        l.utilizationPct = (1.0f - rem) * 100.0f;
+        l.hasUtilization = true;
+      }
+      l.hasReset = readReset(b["resetTime"], l.resetAt);
+      if (l.hasUtilization || l.hasReset) pushSlot(out, l);
+    }
+  }
+}
+
+static void codexWindow(JsonObjectConst w, UsageData &out) {
+  if (w.isNull()) return;
+  UsageLimit l;
+  long secs = w["limit_window_seconds"] | 0L;
+  if (secs > 0 && secs <= 86400) strlcpy(l.label, secs == 18000 ? "5H WINDOW" : "SESSION", sizeof(l.label));
+  else if (secs == 604800) strlcpy(l.label, "WEEKLY", sizeof(l.label));
+  else if (secs > 0) snprintf(l.label, sizeof(l.label), "%uD WINDOW", (unsigned)((secs / 86400) % 100));
+  else strlcpy(l.label, "LIMIT", sizeof(l.label));
+  l.hasUtilization = readNumber(w["used_percent"], l.utilizationPct);
+  long resetAt = w["reset_at"] | 0L;  // epoch (rate_limit_window_snapshot.rs: i32)
+  if (resetAt > 0) {
+    l.resetAt = (time_t)resetAt;
+    l.hasReset = true;
+  }
+  if (l.hasUtilization || l.hasReset) pushSlot(out, l);
+}
+
+static void fromCodex(JsonObjectConst root, UsageData &out) {
+  JsonObjectConst rl = root["rate_limit"].as<JsonObjectConst>();
+  if (rl.isNull()) return;
+  codexWindow(rl["primary_window"].as<JsonObjectConst>(), out);
+  codexWindow(rl["secondary_window"].as<JsonObjectConst>(), out);
+}
+
+static void fromGrok(JsonObjectConst root, UsageData &out) {
+  JsonObjectConst c = root["config"].as<JsonObjectConst>();
+  if (c.isNull()) return;
+  UsageLimit l;
+  strlcpy(l.label, "CREDITS", sizeof(l.label));
+  if (c["creditUsagePercent"].is<float>()) {
+    l.hasUtilization = readNumber(c["creditUsagePercent"], l.utilizationPct);
+  } else if (c["onDemandCap"]["val"].is<float>() && c["onDemandUsed"]["val"].is<float>()) {
+    float cap = c["onDemandCap"]["val"].as<float>(), used = c["onDemandUsed"]["val"].as<float>();
+    if (cap > 0) {
+      float pct = used / cap * 100.0f;
+      l.utilizationPct = pct < 0 ? 0 : (pct > 100 ? 100 : pct);
+      l.hasUtilization = true;
+    }
+  }
+  // GrokCreditsProxyFetcher.swift:58-60: a currentPeriod.end az elsodleges, kulonben billingPeriodEnd
+  l.hasReset = readReset(c["currentPeriod"]["end"], l.resetAt) || readReset(c["billingPeriodEnd"], l.resetAt);
+  if (l.hasUtilization || l.hasReset) pushSlot(out, l);
+}
+
+FetchError parseProviderUngated(ClaudeTransport transport, const char *body, size_t len, UsageData &out, UsageSource &source) {
+  out = UsageData();
+  source = UsageSource::None;
+  if (!body || len == 0) return FetchError::Parse;
+  JsonDocument doc;
+  if (deserializeJson(doc, body, len) || !doc.is<JsonObjectConst>()) return FetchError::Parse;
+  JsonObjectConst root = doc.as<JsonObjectConst>();
+  switch (transport) {
+    case ClaudeTransport::Gemini:
+      fromGemini(root, out);
+      source = UsageSource::GeminiBuckets;
+      break;
+    case ClaudeTransport::ChatGpt:
+      fromCodex(root, out);
+      source = UsageSource::CodexRateLimit;
+      break;
+    case ClaudeTransport::Grok:
+      fromGrok(root, out);
+      source = UsageSource::GrokCredits;
+      break;
+    default:
+      return parseUsageUngated(body, len, out, source);
+  }
+  if (out.count == 0) {
+    source = UsageSource::None;
+    return FetchError::Parse;
+  }
+  return FetchError::None;
+}
+
+static const char *sourceName(UsageSource s) {
+  switch (s) {
+    case UsageSource::LimitsArray: return "limits[]";
+    case UsageSource::TopLevel: return "five_hour/seven_day";
+    case UsageSource::GeminiBuckets: return "gemini buckets[]";
+    case UsageSource::CodexRateLimit: return "chatgpt rate_limit";
+    case UsageSource::GrokCredits: return "grok credits";
+    default: return "ismeretlen";
+  }
+}
+
+FetchError parseUsage(ClaudeTransport transport, const String &body, UsageData &out) {
   UsageSource source;
-  FetchError err = parseUsageUngated(body.c_str(), body.length(), out, source);
+  bool claude = transport == ClaudeTransport::OAuth || transport == ClaudeTransport::WebSession;
+  FetchError err = claude ? parseUsageUngated(body.c_str(), body.length(), out, source)
+                          : parseProviderUngated(transport, body.c_str(), body.length(), out, source);
   // Csak a forras es a limitek szama kerul logba (ertek nem).
-  Serial.printf("[parser] forras=%s, limitek=%u, eredmeny=%s\n",
-                source == UsageSource::LimitsArray ? "limits[]" : source == UsageSource::TopLevel ? "five_hour/seven_day" : "ismeretlen",
-                (unsigned)out.count, err == FetchError::None ? "OK" : fetchErrorTitle(err));
+  Serial.printf("[parser] forras=%s, limitek=%u, eredmeny=%s\n", sourceName(source), (unsigned)out.count,
+                err == FetchError::None ? "OK" : fetchErrorTitle(err));
 #if USAGE_PARSER_ENABLE == 0
-  if (err == FetchError::None) {
+  if (claude && err == FetchError::None) {
     out = UsageData();
     return FetchError::ParserPending;
   }

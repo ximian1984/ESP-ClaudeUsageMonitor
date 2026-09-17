@@ -41,15 +41,18 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
   <button type="submit">Save</button> <button type="button" onclick="resetWifiForm()">New</button>
 </form>
 
-<h2>Claude profiles</h2>
-<div class="tw"><table><thead><tr><th>Name</th><th>Source</th><th>Organization ID</th><th>Enabled</th><th>Auth</th><th>Last update</th><th></th></tr></thead><tbody id="claudeList"></tbody></table></div>
+<h2>AI profiles (Claude, ChatGPT, Gemini, Grok)</h2>
+<div class="tw"><table><thead><tr><th>Name</th><th>Source</th><th>Account / project</th><th>Enabled</th><th>Auth</th><th>Last update</th><th></th></tr></thead><tbody id="claudeList"></tbody></table></div>
 <form id="claudeForm" onsubmit="return saveClaude(event)">
   <input type="hidden" name="idx" value="-1">
-  <b id="claudeFormTitle">Add Claude profile</b>
+  <b id="claudeFormTitle">Add profile</b>
   <label>Name (max 12, empty = Profile-XX)</label><input type="text" name="name" maxlength="12" placeholder="Profile-XX">
   <label>Source</label><select name="transport" onchange="onTransport()">
-    <option value="oauth">api.anthropic.com (OAuth, recommended)</option>
-    <option value="web-session">claude.ai web (sessionKey cookie)</option>
+    <option value="oauth">Claude (claude.ai account)</option>
+    <option value="chatgpt">ChatGPT (Codex usage limits)</option>
+    <option value="gemini">Gemini (Google account, Gemini CLI / Code Assist quota)</option>
+    <option value="grok">Grok (SuperGrok / Grok CLI credits)</option>
+    <option value="web-session">Claude web (sessionKey cookie, legacy)</option>
   </select>
   <div id="orgRow"><label>Organization ID (UUID, needed for claude.ai web)</label><input type="text" name="orgId" maxlength="36"></div>
   <div id="authRow"><label>sessionKey cookie value</label><input type="password" name="auth" maxlength="300" autocomplete="off">
@@ -58,18 +61,25 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
   <button type="submit">Save</button> <button type="button" onclick="resetClaudeForm()">New</button>
   <div id="oauthRow">
     <button type="button" class="primary" onclick="authNow()">Authenticate now</button>
-    <div class="muted">Saves this profile and opens the Claude sign-in page in a new tab. Approve there, copy the code, paste it below.</div>
+    <div class="muted" id="oauthHint">Saves this profile and opens the sign-in page in a new tab.</div>
   </div>
 </form>
 
 <div id="loginFlow" style="display:none;background:#1b1b1b;padding:8px;border-radius:6px;margin-top:8px">
-  <b>OAuth login</b>
-  <div class="muted">1. Sign in to Claude and approve (if the tab did not open, use this button):</div>
-  <a id="authUrl" class="primary" href="#" target="_blank" rel="noopener">Open Claude sign-in page</a>
-  <div class="muted">2. After approving, the page shows a code. Paste it here (format <code>code#state</code>):</div>
-  <input type="text" id="oauthCode" placeholder="code#state" autocomplete="off">
-  <button type="button" class="primary" onclick="finishLogin()">Submit code</button>
-  <button type="button" onclick="$('loginFlow').style.display='none'">Cancel</button>
+  <b id="loginTitle">Sign in</b>
+  <div class="muted" id="loginStep1">1. Sign in and approve (if the tab did not open, use this button):</div>
+  <a id="authUrl" class="primary" href="#" target="_blank" rel="noopener">Open sign-in page</a>
+  <div id="codeRow">
+    <div class="muted" id="codeHint">2. After approving, the page shows a code. Paste it here:</div>
+    <input type="text" id="oauthCode" placeholder="code" autocomplete="off">
+    <button type="button" class="primary" onclick="finishLogin()">Submit code</button>
+  </div>
+  <div id="deviceRow" style="display:none">
+    <div class="muted">2. Enter this code on the sign-in page, then approve:</div>
+    <div id="userCode" style="font-size:2em;font-weight:bold;letter-spacing:.1em;text-align:center;margin:8px 0;user-select:all"></div>
+    <div class="muted" id="deviceStatus">Waiting for approval...</div>
+  </div>
+  <button type="button" onclick="stopLogin()">Cancel</button>
 </div>
 
 <h2>Display &amp; refresh</h2>
@@ -115,13 +125,13 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
     the admin password that was valid at export time. A restored Claude token may already be expired or rotated - then
     just authenticate again.</div>
   <button type="button" class="primary" onclick="doExport()">Export settings</button>
-  <label>Import settings from file (replaces ALL Wi-Fi and Claude profiles, display and time zone)</label>
+  <label>Import settings from file (replaces ALL Wi-Fi and AI profiles, display and time zone)</label>
   <input type="file" id="impFile" accept="application/json,.json" onchange="checkImpFile()">
   <div id="impPwRow" style="display:none">
     <label>This file is encrypted - admin password used at export time</label>
     <input type="password" id="impPw" autocomplete="off">
   </div>
-  <div class="muted">Profiles in the file without secrets keep the passwords/tokens already on the device (same SSID, same Claude name).</div>
+  <div class="muted">Profiles in the file without secrets keep the passwords/tokens already on the device (same SSID, same profile name and source).</div>
   <button type="button" class="primary" onclick="doImport()">Import settings</button>
 </form>
 
@@ -207,33 +217,54 @@ function renderClaude(st){
   const tb=$('claudeList');tb.textContent='';
   for(const c of cfg.claude){const tr=document.createElement('tr');
     const s=(st||[]).find(x=>x.idx===c.idx);
-    const authState=c.transport==='oauth'?(c.hasRefresh?(c.expiresAt?'token, exp '+new Date(c.expiresAt*1000).toLocaleTimeString():'token'):'NOT LOGGED IN'):(c.hasAuth?'set':'missing');
+    const authState=c.transport==='web-session'?(c.hasAuth?'set':'missing'):(c.hasRefresh?(c.transport==='oauth'&&c.expiresAt?'token, exp '+new Date(c.expiresAt*1000).toLocaleTimeString():'logged in'):'NOT LOGGED IN');
     cell(tr,c.name);cell(tr,c.transport);cell(tr,c.orgId||'-');cell(tr,c.enabled?'yes':'no');cell(tr,authState);
     cell(tr,s?(s.hasData?s.lastOkAgoS+' s ago':'-')+(s.lastError?' / '+s.lastError+(s.httpStatus?' '+s.httpStatus:''):''):'-');
     const td=cell(tr,'');
     btn(td,'Edit',()=>editClaude(c));
-    if(c.transport==='oauth')btn(td,'Authenticate',()=>{const w=window.open('about:blank','_blank');startLogin(c.idx,w).catch(e=>say(e.message))});
+    if(c.transport!=='web-session')btn(td,'Authenticate',()=>{const w=window.open('about:blank','_blank');startLogin(c.idx,w).catch(e=>say(e.message))});
     btn(td,c.enabled?'Disable':'Enable',()=>post('/api/claude',{idx:c.idx,name:c.name,transport:c.transport,orgId:c.orgId,enabled:c.enabled?'0':'1'}).then(load).catch(e=>say(e.message)));
     btn(td,'Delete',()=>{if(confirm('Delete '+c.name+'?'))post('/api/claude/delete',{idx:c.idx}).then(load).catch(e=>say(e.message))},'danger');
     tb.appendChild(tr)}
 }
 function editClaude(c){const f=$('claudeForm');f.idx.value=c.idx;f.elements['name'].value=c.name;f.transport.value=c.transport;f.orgId.value=c.orgId;f.auth.value='';f.enabled.checked=c.enabled;
-  onTransport();$('claudeFormTitle').textContent='Edit Claude profile';}
-function onTransport(){const oauth=$('claudeForm').transport.value==='oauth';$('orgRow').style.display=oauth?'none':'block';$('authRow').style.display=oauth?'none':'block';$('oauthRow').style.display=oauth?'block':'none';}
+  onTransport();$('claudeFormTitle').textContent='Edit profile';}
+const PROVIDER_HINT={oauth:'Claude: sign in, approve, copy the code#state shown and paste it here.',
+  chatgpt:'ChatGPT: a short code is shown here; enter it on auth.openai.com and approve. No copy-paste back.',
+  gemini:'Gemini: sign in with Google, approve, copy the code shown and paste it here. Use the Gemini CLI once first.',
+  grok:'Grok: a short code is shown here; enter it on accounts.x.ai and approve. No copy-paste back.'};
+function onTransport(){const t=$('claudeForm').transport.value;const oauth=t!=='web-session';$('orgRow').style.display=oauth?'none':'block';$('authRow').style.display=oauth?'none':'block';$('oauthRow').style.display=oauth?'block':'none';
+  if(oauth)$('oauthHint').textContent='Saves this profile and opens the sign-in page in a new tab. '+(PROVIDER_HINT[t]||'')}
 let loginIdx=-1;
 // A bongeszo csak kattintasra enged uj fulet: a hivo a kattintaskor nyit egy ures fulet (w), ide kerul az URL.
-function startLogin(idx,w){loginIdx=idx;return post('/api/oauth/start',{idx}).then(j=>{$('authUrl').href=j.authorizeUrl;$('oauthCode').value='';
+// Ket fajta login: "code" (Claude/Gemini: kodot kell visszamasolni) es "device" (ChatGPT/Grok: kodot kell beirni az
+// oldalon, a dongle maga kerdezi le a jovahagyast -> /api/oauth/poll).
+let pollTimer=null,pollUntil=0;
+function stopLogin(){if(pollTimer){clearTimeout(pollTimer);pollTimer=null}$('loginFlow').style.display='none'}
+function pollLogin(idx,interval){pollTimer=setTimeout(()=>{
+  if(Date.now()>pollUntil){stopLogin();say('Sign-in timed out, start again');return}
+  post('/api/oauth/poll',{idx}).then(j=>{
+    if(j.status==='done'){stopLogin();say('Logged in');load();return}
+    $('deviceStatus').textContent='Waiting for approval... ('+new Date().toLocaleTimeString()+')';
+    pollLogin(idx,j.interval||interval)}).catch(e=>{stopLogin();say(e.message)})},interval*1000)}
+function startLogin(idx,w){loginIdx=idx;if(pollTimer){clearTimeout(pollTimer);pollTimer=null}
+  return post('/api/oauth/start',{idx}).then(j=>{const url=j.url||j.authorizeUrl;$('authUrl').href=url;$('oauthCode').value='';
+  $('loginTitle').textContent='Sign in: '+(j.provider||'');$('authUrl').textContent='Open '+(j.provider||'')+' sign-in page';
+  const dev=j.mode==='device';$('codeRow').style.display=dev?'none':'block';$('deviceRow').style.display=dev?'block':'none';
+  if(dev){$('userCode').textContent=j.userCode;pollUntil=Date.now()+(j.expiresIn||900)*1000;pollLogin(idx,j.interval||5)}
+  else{$('oauthCode').placeholder=j.codeFormat||'code';$('codeHint').textContent='2. After approving, the page shows a code. Paste it here (format '+(j.codeFormat||'code')+'):'}
   $('loginFlow').style.display='block';$('loginFlow').scrollIntoView({behavior:'smooth'});
-  if(w&&!w.closed){w.location.href=j.authorizeUrl;say('Claude sign-in opened in a new tab. Approve, copy the code, paste it below.')}
-  else say('Tap "Open Claude sign-in page", approve, then paste the code below.');}).catch(e=>{if(w&&!w.closed)w.close();throw e});}
-function authNow(){const f=$('claudeForm');const d=formData(f);if(!d.enabled)d.enabled='0';delete d.auth;delete d.orgId;d.transport='oauth';
+  if(w&&!w.closed){w.location.href=url;say(dev?'Sign-in page opened in a new tab: enter the code shown below and approve.':'Sign-in opened in a new tab. Approve, copy the code, paste it below.')}
+  else say(dev?'Tap "Open sign-in page", enter the code shown below and approve.':'Tap "Open sign-in page", approve, then paste the code below.');}).catch(e=>{if(w&&!w.closed)w.close();throw e});}
+function authNow(){const f=$('claudeForm');const d=formData(f);if(!d.enabled)d.enabled='0';delete d.auth;delete d.orgId;
+  if(d.transport==='web-session'){say('Claude web uses a sessionKey: fill it in and press Save');return}
   const w=window.open('about:blank','_blank');
-  post('/api/claude',d).then(j=>{f.idx.value=j.idx;$('claudeFormTitle').textContent='Edit Claude profile';load();return startLogin(j.idx,w)})
+  post('/api/claude',d).then(j=>{f.idx.value=j.idx;$('claudeFormTitle').textContent='Edit profile';load();return startLogin(j.idx,w)})
     .catch(e=>{if(w&&!w.closed)w.close();say(e.message)})}
 function finishLogin(){post('/api/oauth/finish',{idx:loginIdx,code:$('oauthCode').value}).then(()=>{$('loginFlow').style.display='none';$('oauthCode').value='';say('Logged in');load();}).catch(e=>say(e.message));}
-function resetClaudeForm(){const f=$('claudeForm');f.reset();f.idx.value=-1;onTransport();$('claudeFormTitle').textContent='Add Claude profile'}
-function saveClaude(ev){ev.preventDefault();const f=ev.target;const d=formData(f);if(!d.enabled)d.enabled='0';if(d.transport==='oauth'){delete d.auth;delete d.orgId}else if(d.auth)d.changeAuth='1';
-  post('/api/claude',d).then(()=>{say('Claude profile saved');resetClaudeForm();load()}).catch(e=>say(e.message));return false}
+function resetClaudeForm(){const f=$('claudeForm');f.reset();f.idx.value=-1;onTransport();$('claudeFormTitle').textContent='Add profile'}
+function saveClaude(ev){ev.preventDefault();const f=ev.target;const d=formData(f);if(!d.enabled)d.enabled='0';if(d.transport!=='web-session'){delete d.auth;delete d.orgId}else if(d.auth)d.changeAuth='1';
+  post('/api/claude',d).then(()=>{say('Profile saved');resetClaudeForm();load()}).catch(e=>say(e.message));return false}
 
 function onTzSel(){const v=$('tzSel').value;if(v)$('tzStr').value=v;else $('tzStr').focus()}
 function showTz(tz){$('tzStr').value=tz;const o=[...$('tzSel').options].find(x=>x.value===tz);$('tzSel').value=o?tz:''}
@@ -259,13 +290,13 @@ function doImport(){const f=$('impFile').files[0];if(!f){say('Choose a file firs
     if(j.format==='device-config-encrypted'){const pw=$('impPw').value;$('impPwRow').style.display='block';
       if(!pw){$('impPw').focus();throw new Error('This file is encrypted: enter the admin password used at export time')}
       body=JSON.stringify({backup:j,password:pw})}
-    if(!confirm('Import replaces ALL Wi-Fi and Claude profiles, display and time zone settings. Continue?'))return;
+    if(!confirm('Import replaces ALL Wi-Fi and AI profiles, display and time zone settings. Continue?'))return;
     if(j.format==='device-config-encrypted')say('Decrypting (takes a few seconds)...');
     const h={'X-CMon':'1','Content-Type':'application/json'};if(token)h['X-CMon-Token']=token;
     return fetch('/api/import',{method:'POST',headers:h,body:body}).then(r=>r.json().then(j=>{
       if(r.status===401){lock();throw new Error('login required')}
       if(!j.ok)throw new Error(j.error||'import failed');
-      $('impFile').value='';$('impPw').value='';$('impPwRow').style.display='none';say('Imported: '+j.wifi+' Wi-Fi, '+j.claude+' Claude profiles'+(j.reconnect?' - Wi-Fi reconnecting...':''));load()}))})
+      $('impFile').value='';$('impPw').value='';$('impPwRow').style.display='none';say('Imported: '+j.wifi+' Wi-Fi, '+j.claude+' AI profiles'+(j.reconnect?' - Wi-Fi reconnecting...':''));load()}))})
   .catch(e=>say(e.message))}
 function saveDisplay(ev){ev.preventDefault();Promise.all([post('/api/display',{rotationSec:$('rot').value}),post('/api/refresh',{refreshSec:$('refr').value})]).then(()=>say('Saved')).catch(e=>say(e.message));return false}
 

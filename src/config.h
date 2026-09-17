@@ -17,7 +17,11 @@
 #define WIFI_PASS_MAX   64   // WPA2-PSK
 #define CLAUDE_NAME_MAX 12   // a 160 px szeles kijelzore
 #define CLAUDE_ORG_MAX  40   // UUID 36 + tartalek
-#define CLAUDE_AUTH_MAX 300  // access/refresh token, sessionKey — fejlecbe kerul (⚠ [feltarando] pontos hossz)
+#define CLAUDE_AUTH_MAX 300  // Claude access token (mert: 108 kar.) / sessionKey — NVS-ben
+#define CLAUDE_REFRESH_MAX 512  // refresh token (Claude mert: 108; Google/OpenAI/xAI ⚠ [vason merendo]) — NVS-ben
+// Az uj szolgaltatok access tokenje CSAK RAM-ban (token_cache): a Google-e akar 2048 bajt, az OpenAI-e JWT;
+// 5 profil x 2 KB nem ferne a 0x5000-es NVS-be (PLAN 2.13/b). Inditas utan egy refresh potolja.
+#define PROVIDER_ACCESS_MAX 2600
 #define CLAUDE_SCOPE_MAX 160 // OAuth scope-lista (az alap lista ~100 karakter)
 
 // --- Kijelzo ---
@@ -35,11 +39,16 @@
 // --- Claude transport ---
 // Dontes (projektgazda, 2026-09-16): ELSODLEGES az OAuth (on-device login + auto-refresh), a sessionKey masodlagos.
 // Profilonkent valaszthato; a reszletek (host, path, fejlecek) egy helyen: claude_client.cpp kTransports[].
+// 2026-09-17: tovabbi szolgaltatok (projektgazda) — forras es meres: PLAN.md 2.13/b. Az NVS-ben a szam tarolodik,
+// ezert a meglevo ertekek (0, 1) nem valtozhatnak.
 enum class ClaudeTransport : uint8_t {
-  OAuth = 0,       // api.anthropic.com + OAuth Bearer — ELSODLEGES; 200-as valasz mert (a koordinator, 2026-09-16)
-  WebSession = 1,  // claude.ai web + sessionKey suti — masodlagos; 200-as valasz ezen az uton MEG NEM mert
+  OAuth = 0,       // Claude: api.anthropic.com + OAuth Bearer — 200-as valasz mert (2026-09-16), vason fut (2026-09-17)
+  WebSession = 1,  // Claude web + sessionKey suti — masodlagos; 200-as valasz ezen az uton MEG NEM mert
+  Gemini = 2,      // Google Code Assist kvota (Gemini CLI login) — ⚠ [vason merendo]
+  ChatGpt = 3,     // ChatGPT / Codex keret (Codex CLI eszkozkod-login) — ⚠ [vason merendo]
+  Grok = 4,        // Grok CLI credit (xAI eszkozkod-login) — ⚠ [vason merendo]
 };
-#define CLAUDE_TRANSPORT_COUNT 2
+#define CLAUDE_TRANSPORT_COUNT 5
 #define CLAUDE_TRANSPORT_DEFAULT ((uint8_t)ClaudeTransport::OAuth)
 
 // --- OAuth (on-device login PKCE + auto-refresh) ---
@@ -54,7 +63,29 @@ enum class ClaudeTransport : uint8_t {
 #define OAUTH_SCOPES         "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload user:plugins"
 #define OAUTH_REFRESH_MARGIN_S   300     // 5 perccel lejarat elott (a Claude Code isOAuthTokenExpired-je, PLAN 2.8)
 #define OAUTH_REFRESH_RETRY_S    120     // atmeneti frissitesi hiba utan
-#define OAUTH_LOGIN_TTL_MS       600000  // fuggoben levo login (verifier/state) elettartama
+#define OAUTH_LOGIN_TTL_MS       900000  // fuggoben levo login (verifier/state vagy eszkozkod) elettartama (az OpenAI kodja 15 perc)
+#define PROVIDER_ACCESS_DEFAULT_TTL_S 3600  // ha a token-valasz nem ad expires_in-t
+
+// --- Gemini (Google Code Assist; forras: google-gemini/gemini-cli @ 6a466a7e) ---
+// A kliens "installed application": a Google szabalya szerint a secret itt NEM titok (oauth2.ts:79-85 megjegyzese).
+#define GEMINI_CLIENT_ID     "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com"  // oauth2.ts:76
+#define GEMINI_CLIENT_SECRET "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"                                          // oauth2.ts:85
+#define GEMINI_AUTHORIZE_URL "https://accounts.google.com/o/oauth2/v2/auth"  // mert: 302 a Google-belepesre
+#define GEMINI_TOKEN_URL     "https://oauth2.googleapis.com/token"
+#define GEMINI_REDIRECT_URI  "https://codeassist.google.com/authcode"        // oauth2.ts:443 (kezi kod)
+#define GEMINI_SCOPES        "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile"  // oauth2.ts:88-92
+#define GEMINI_API_BASE      "https://cloudcode-pa.googleapis.com/v1internal"  // server.ts:73-74, 532
+
+// --- ChatGPT / Codex (forras: openai/codex @ 7abf2a3b) ---
+#define CHATGPT_CLIENT_ID    "app_EMoamEEZ73f0CkXaXp7hrann"                  // login/src/auth/manager.rs:1732
+#define CHATGPT_AUTH_BASE    "https://auth.openai.com"                       // login/src/server.rs:59
+#define CHATGPT_USAGE_URL    "https://chatgpt.com/backend-api/wham/usage"    // rate_limit_resets.rs:124-129
+
+// --- Grok (forras: xai-org/grok-build @ 48271133; billing: steipete/CodexBar GrokCreditsProxyFetcher.swift) ---
+#define GROK_CLIENT_ID       "b1a00492-073a-47ea-816f-4c329264a828"          // xai-grok-login/src/config.rs:250
+#define GROK_AUTH_BASE       "https://auth.x.ai"                             // config.rs:122; discovery mert
+#define GROK_SCOPES          "openid profile email offline_access grok-cli:access api:access"  // config.rs:4-26 (a minimalisabb halmaz ⚠)
+#define GROK_BILLING_URL     "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
 
 // --- Claude refresh (spec 14.) ---
 // A usage lassan valtozik -> konzervativ, KONFIGURALHATO alap (projektgazda: max uptime, kis labnyom).

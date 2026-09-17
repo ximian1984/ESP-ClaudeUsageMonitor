@@ -18,10 +18,10 @@ struct ClaudeProfile {
   bool enabled = true;
   char name[CLAUDE_NAME_MAX + 1] = "";
   uint8_t transport = CLAUDE_TRANSPORT_DEFAULT;
-  char orgId[CLAUDE_ORG_MAX + 1] = "";  // csak WebSession-hoz kell
+  char orgId[CLAUDE_ORG_MAX + 1] = "";  // WebSession: org-UUID; Gemini: Cloud project-ID; ChatGPT: account-ID (login adja)
   char auth[CLAUDE_AUTH_MAX + 1] = "";  // TITOK — WebSession: sessionKey; OAuth: access token
   // --- csak OAuth ---
-  char refresh[CLAUDE_AUTH_MAX + 1] = "";  // TITOK — refresh token (rotalodhat, ld. saveOAuthTokens)
+  char refresh[CLAUDE_REFRESH_MAX + 1] = "";  // TITOK — refresh token (rotalodhat, ld. saveOAuthTokens)
   char scope[CLAUDE_SCOPE_MAX + 1] = "";   // a legutobb kapott scope; ures = OAUTH_SCOPES
   uint32_t expiresAt = 0;                   // access token lejarata (UTC epoch); 0 = ismeretlen
   // Csak RAM, minden felhasznaloi mentesnel uj: a token-frissites NEM valtoztatja, igy egy automatikus
@@ -76,6 +76,9 @@ class ConfigManager {
   // aramszunet eseten se maradjunk hasznalhatatlan (regi) refresh tokennel.
   bool saveOAuthTokens(int idx, uint32_t editSeq, const char *access, const char *refreshTok, uint32_t expiresAt,
                        const char *scope);
+  // Uj szolgaltatok (Gemini/ChatGPT/Grok): az access token RAM-ban marad (token_cache), ide csak a refresh token,
+  // az account-/project-ID (orgId; nullptr = marad) es a scope (nullptr/ures = marad) kerul.
+  bool saveProviderLogin(int idx, uint32_t editSeq, const char *refreshTok, const char *orgId, const char *scope);
 
  private:
   void load();

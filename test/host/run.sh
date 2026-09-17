@@ -13,6 +13,8 @@ $CXX test_parser.cpp ../../src/usage_parser.cpp ../../src/usage_types.cpp ../../
 "$OUT.parser"
 $CXX -DUSAGE_PARSER_ENABLE=0 -DEXPECT_GATE_CLOSED=1 test_parser.cpp ../../src/usage_parser.cpp ../../src/usage_types.cpp ../../src/time_manager.cpp -o "$OUT.parser_off"
 "$OUT.parser_off"
+$CXX test_providers.cpp ../../src/usage_parser.cpp ../../src/usage_types.cpp ../../src/time_manager.cpp ../../src/base64url.cpp ../../src/jwt_util.cpp -o "$OUT.providers"
+"$OUT.providers"
 
 V="dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 DIG=$(printf "%s" "$V" | openssl dgst -sha256 -binary | xxd -p -c256)

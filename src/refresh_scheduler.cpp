@@ -6,6 +6,8 @@
 #include "config.h"
 #include "config_manager.h"
 #include "oauth_client.h"
+#include "provider_auth.h"
+#include "token_cache.h"
 #include "time_manager.h"
 #include "usage_cache.h"
 #include "usage_parser.h"
@@ -63,8 +65,33 @@ static uint32_t profileIdentity(const ClaudeProfile &c) {
 // Visszaad: None ha a c.auth mostantol hasznalhato; kulonben a jelzendo hiba.
 // A refreshelt tokent config_manager.saveOAuthTokens irja (editSeq-vedelemmel); a c snapshot NEM frissul,
 // ezert siker eseten az uj access tokent az outAccess-be adja vissza a hivonak.
+// Uj szolgaltatok (Gemini/ChatGPT/Grok): az access token a RAM-beli tokenCache-ben. Nincs vagy lejaroban -> refresh.
+// forceRefresh: 401 utan (a cache-beli token mar nem jo).
+static FetchError ensureProviderToken(int idx, const ClaudeProfile &c, String &outAccess, bool forceRefresh) {
+  time_t nowEpoch = timeManager.now();
+  if (!forceRefresh && tokenCache.get(idx, outAccess, nowEpoch, OAUTH_REFRESH_MARGIN_S)) return FetchError::None;
+  if (!c.refresh[0]) return FetchError::NotConfigured;  // meg nincs bejelentkezve
+  ClaudeTransport t = (ClaudeTransport)c.transport;
+  ProviderTokens r = providerRefresh(t, c.refresh, c.scope);
+  if (!r.ok) {
+    tokenCache.clear(idx);
+    return r.invalidGrant ? FetchError::ReloginRequired : FetchError::RefreshFailed;
+  }
+  uint32_t ttl = r.expiresIn ? r.expiresIn : PROVIDER_ACCESS_DEFAULT_TTL_S;
+  // ELOSZOR a rotalt refresh token perzisztal (ha jott), csak utana hasznaljuk az uj access tokent.
+  bool rotated = r.refresh.length() && strcmp(r.refresh.c_str(), c.refresh) != 0;
+  bool newAccount = r.accountId.length() && strcmp(r.accountId.c_str(), c.orgId) != 0;
+  if (rotated || newAccount)
+    configManager.saveProviderLogin(idx, c.editSeq, rotated ? r.refresh.c_str() : c.refresh,
+                                    newAccount ? r.accountId.c_str() : nullptr, r.scope.c_str());
+  tokenCache.set(idx, r.access, nowEpoch + (time_t)ttl);
+  outAccess = r.access;
+  return FetchError::None;
+}
+
 static FetchError ensureOAuthToken(int idx, const ClaudeProfile &c, String &outAccess) {
   outAccess = c.auth;
+  if (providerUsesRamAccess((ClaudeTransport)c.transport)) return ensureProviderToken(idx, c, outAccess, false);
   if (c.transport != (uint8_t)ClaudeTransport::OAuth) return FetchError::None;
 
   time_t nowEpoch = timeManager.now();
@@ -113,7 +140,10 @@ void RefreshScheduler::run() {
         const ClaudeProfile &c = cfg.claude[i];
         uint32_t id = profileIdentity(c);
         bool nowActive = c.used && c.enabled;
-        if (id != identity[i]) usageCache.clear(i);
+        if (id != identity[i]) {
+          usageCache.clear(i);
+          if (identity[i] != 0) tokenCache.clear(i);  // felhasznaloi szerkesztes: a regi RAM-token nem ervenyes
+        }
         if (nowActive && (!active[i] || id != identity[i])) {
           nextDue[i] = now + 2000 + (uint32_t)k * (periodMs / (uint32_t)n);
         }
@@ -146,9 +176,31 @@ void RefreshScheduler::run() {
       const ClaudeProfile &c = cfg.claude[pick];
       String access;
       err = ensureOAuthToken(pick, c, access);  // OAuth: auto-refresh a lekeres elott
+      String orgId = c.orgId;
+      // Gemini: a kvota-lekereshez project-ID kell; ha a login-kor nem sikerult, itt potoljuk (loadCodeAssist).
+      if (err == FetchError::None && c.transport == (uint8_t)ClaudeTransport::Gemini && orgId.isEmpty()) {
+        String perr;
+        orgId = geminiLoadProject(access, perr);
+        if (orgId.isEmpty()) {
+          Serial.printf("[sched] gemini: %s\n", perr.c_str());
+          err = FetchError::NotConfigured;
+        } else {
+          configManager.saveProviderLogin(pick, c.editSeq, c.refresh, orgId.c_str(), nullptr);
+        }
+      }
       if (err == FetchError::None) {
-        resp = fetchUsage((ClaudeTransport)c.transport, c.orgId, access.c_str());
+        resp = fetchUsage((ClaudeTransport)c.transport, orgId.c_str(), access.c_str());
         _fetchCount++;
+        // Uj szolgaltato + 401/403: a RAM-beli token lejarhatott/visszavontak -> egyszeri refresh + ujra.
+        if (resp.error == FetchError::Auth && providerUsesRamAccess((ClaudeTransport)c.transport) && c.refresh[0]) {
+          FetchError re = ensureProviderToken(pick, c, access, true);
+          if (re == FetchError::None) {
+            resp = fetchUsage((ClaudeTransport)c.transport, orgId.c_str(), access.c_str());
+            _fetchCount++;
+          } else if (re == FetchError::ReloginRequired) {
+            resp.error = FetchError::ReloginRequired;
+          }
+        }
         // OAuth + 401/403: hatha eppen most jart le -> egyszeri refresh + ujra.
         if (resp.error == FetchError::Auth && c.transport == (uint8_t)ClaudeTransport::OAuth && c.refresh[0]) {
           OAuthTokens t = oauthRefresh(c.refresh, c.scope);
@@ -168,7 +220,8 @@ void RefreshScheduler::run() {
     }
 
     UsageData data;
-    if (err == FetchError::None) err = parseUsage(resp.body, data);
+    uint8_t pickTransport = configManager.heapSnapshot()->claude[pick].transport;
+    if (err == FetchError::None) err = parseUsage((ClaudeTransport)pickTransport, resp.body, data);
     resp.body = "";  // felszabaditas
 
     // Kozben modosult/torolt profil: az eredmeny mar nem ehhez a profilhoz tartozik.

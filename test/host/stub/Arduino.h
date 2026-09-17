@@ -5,7 +5,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
-struct String : std::string { using std::string::string; String(const char*s):std::string(s){} String(const std::string&s):std::string(s){} };
+struct String : std::string { using std::string::string; String(const char*s):std::string(s){} String(const std::string&s):std::string(s){}
+  int indexOf(char c, int from = 0) const { auto p = find(c, (size_t)from); return p == npos ? -1 : (int)p; } };
 inline uint32_t millis(){return 0;}
 inline void configTzTime(const char*,const char*,const char*){}
 #include <cctype>

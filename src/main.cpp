@@ -8,6 +8,7 @@
 #include "display_manager.h"
 #include "refresh_scheduler.h"
 #include "time_manager.h"
+#include "token_cache.h"
 #include "usage_cache.h"
 #include "web_setup.h"
 #include "wifi_manager.h"
@@ -39,6 +40,7 @@ void setup() {
   configManager.begin();
   adminAuth.begin();
   usageCache.begin();
+  tokenCache.begin();
   timeManager.begin(configManager.heapSnapshot()->tz);
   displayManager.begin();
 

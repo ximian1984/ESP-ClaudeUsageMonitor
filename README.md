@@ -6,8 +6,9 @@ beépített 160×80-as kijelzőn váltogatja több Claude-fiók adatait. Nincs k
 Spec: [`../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md`](../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md) ·
 Mért alapok, döntések: [`PLAN.md`](PLAN.md)
 
-> **Állapot (2026-09-17):** első flash **vason sikeres** (host): indul, a kijelzőn `NO WIFI - SETUP`. Wi-Fi, OAuth-login és usage-lekérés vason még nem futott (PLAN 2.11). Az adatlekérés elsődleges útja az
-> **OAuth on-device bejelentkezés + automatikus tokenfrissítés** (11.); a sessionKey másodlagos opció.
+> **Állapot (2026-09-17 este):** **Claude vason fut** (host): Wi-Fi, OAuth-login, usage-lekérés `HTTP 200` a kijelzőn;
+> titkosított export/import, lezárt setup-oldal (Playwright 25/25, 18/18). **ChatGPT, Gemini, Grok: megírva, fordul, host-teszt
+> zöld, vason MÉG NEM futott** (11., PLAN 2.13). Még nem mért: a Claude-token automatikus frissítése (~8 h), Wi-Fi nélküli képernyő.
 > Amit itt `⚠ [vason mérendő]` jelöl, az a forrásból következik, nem mérésből.
 
 ---
@@ -187,9 +188,9 @@ felvett, nagyobb prioritású hálózatra az eszköz a következő kapcsolatvesz
 Szerkesztésnél az üresen hagyott jelszómező megtartja a tároltat. Nyílt hálózathoz pipáld be a
 „clear stored password" jelölőt.
 
-## 9. Több Claude profil
+## 9. Több AI-profil (Claude, ChatGPT, Gemini, Grok)
 
-Legfeljebb **5** profil: név (max. 12 karakter, a kijelzőn mindig látszik; üresen hagyva `Profile-XX`, ahol XX véletlen 00–99, ütközés nélkül), Source (OAuth vagy claude.ai web,
+Legfeljebb **5** profil: név (max. 12 karakter, a kijelzőn mindig látszik; üresen hagyva `Profile-XX`, ahol XX véletlen 00–99, ütközés nélkül), Source (Claude OAuth, ChatGPT, Gemini, Grok vagy Claude web,
 lásd 11.), engedélyezve. OAuth-nál a tokent a bejelentkezés adja; web-nél Organization ID + sessionKey.
 
 - Minden profil saját cache-t kap. Hiba esetén az utolsó érvényes adat megmarad, és a kijelző mutatja a korát.
@@ -263,6 +264,27 @@ Cél: egyszeri bejelentkezés után az eszköz **magától** frissíti a tokent,
 - **Dedikált token:** a saját bejelentkezésed külön tokent ad, ezért nem ütközik a gépeden futó Claude Code-dal.
 - Ha a frissítő token véglegesen érvénytelen lesz, a kijelzőn **RE-LOGIN NEEDED**, és a fenti lépéseket meg kell ismételni.
 - Végpontok/azonosító a Claude Code kliensből (forrás: [`PLAN.md`](PLAN.md) 2.8–2.9). PKCE S256 + state (CSRF).
+
+### ChatGPT, Gemini, Grok — ⚠ megírva, vason MÉG NEM futott (2026-09-17)
+
+Ugyanaz a profil-lista és kijelző; a **Source** mezőben választható. Forrás és mérés (hamis tokennel):
+[`PLAN.md`](PLAN.md) 2.13/b. Mindhárom **nem hivatalos, belső végpont**, egy másik alkalmazás (Codex CLI / Gemini CLI / Grok CLI)
+nyilvános OAuth-kliensével. Bármikor eltörhet, és a szolgáltatási feltételekbe ütközhet ⚠ (ToS nincs átnézve).
+
+| Source | Login a felületen | Mit mutat a kijelző |
+|---|---|---|
+| **ChatGPT** | *Authenticate now* → a felület mutat egy **rövid kódot** + megnyitja az `auth.openai.com/codex/device` oldalt → ott beírod és jóváhagyod. **Visszamásolni nem kell**, a dongle maga kérdezi le. | Codex-keret: `5H WINDOW` és `WEEKLY` (használt %, reset). A sima ChatGPT-üzenetkeretre nincs végpont. |
+| **Gemini** | *Authenticate now* → Google-bejelentkezés → a `codeassist.google.com` oldal kiír egy kódot → bemásolod. **Előtte a Gemini CLI-t egyszer használni kell** (onboarding, `loadCodeAssist` project). | Modellenként (pl. `2.5 PRO`, `2.5 FLASH`) a használt % = 100 × (1 − `remainingFraction`), reset. |
+| **Grok** | *Authenticate now* → **rövid kód** + `accounts.x.ai/oauth2/device` → beírod, jóváhagyod. | `CREDITS` (használt %), reset a számlázási időszak végén. |
+
+- **Tokenek:** az új szolgáltatóknál az access token **csak RAM-ban** van (akár 2 KB, nem férne az NVS-be), az NVS-ben a refresh token
+  (max. 512 kar.) és az account-/project-ID. Újraindítás után egy refresh pótolja; a rotált refresh token azonnal NVS-be kerül.
+- **Végleges refresh-hiba** → `RE-LOGIN NEEDED` (Google/xAI: `invalid_grant`; OpenAI: `401` + `refresh_token_*`/`token_expired`).
+- ⚠ **Gemini-scope:** a Gemini CLI kliense `cloud-platform` scope-ot kér (teljes Google Cloud-hozzáférés). Az eszközön tárolt refresh token
+  ennyit ér: aki a dongle NVS-ét kiolvassa, a Google Cloud-fiókhoz is hozzáfér. Admin-jelszó + titkosított export ajánlott.
+- **TLS:** a CA-csomagba bekerült a **GTS Root R1** (googleapis.com); mind a 9 használt hoszt `0 (ok)` (openssl, 2026-09-17).
+- **Host-teszt:** `test/host/test_providers.cpp`. A minták **szintetikusak**, a forrásbeli sémából; a valós válaszalak vason mérendő.
+  Mutációs próba: a Gemini-képlet és a heti ablak felismerésének elrontását elkapta.
 
 ### sessionKey (claude.ai web) — másodlagos, kézi
 

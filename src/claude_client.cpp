@@ -1,10 +1,12 @@
 #include "claude_client.h"
 
+#include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 
 #include "ca_certs.h"
 #include "config.h"
+#include "https_util.h"
 
 // A body-t legfeljebb CLAUDE_MAX_BODY_BYTES-ig gyujti; ami folotte van, azt eldobja es jelzi.
 // (A valasz chunked — mert, PLAN.md 2.2 —, ezert a Content-Length nem hasznalhato elore.)
@@ -79,6 +81,10 @@ struct TransportSpec {
 static const TransportSpec kTransports[CLAUDE_TRANSPORT_COUNT] = {
     {ClaudeTransport::OAuth, "oauth", "api.anthropic.com", "/api/oauth/usage", "", false, authOAuth},
     {ClaudeTransport::WebSession, "web-session", "claude.ai", "/api/organizations/", "/usage", true, authWebSession},
+    // Az uj szolgaltatok kerese a fetchProvider()-ben (httpsRequest); itt csak a nevuk szerepel.
+    {ClaudeTransport::Gemini, "gemini", "", "", "", false, nullptr},
+    {ClaudeTransport::ChatGpt, "chatgpt", "", "", "", false, nullptr},
+    {ClaudeTransport::Grok, "grok", "", "", "", false, nullptr},
 };
 
 // Azonosito szerinti kereses. Vason mert hiba (2026-09-17): a tomb korabban indexelve volt, de a sorrendje
@@ -93,7 +99,74 @@ static const TransportSpec *spec(ClaudeTransport t) {
 const char *transportName(ClaudeTransport t) { return spec(t) ? spec(t)->name : "?"; }
 bool transportNeedsOrgId(ClaudeTransport t) { return spec(t) && spec(t)->needsOrgId; }
 
+// HTTP-statusz -> FetchError (ugyanaz a leképezés, mint a Claude-uton).
+static ClaudeResponse fromHttps(HttpsResult &h) {
+  ClaudeResponse r;
+  r.httpStatus = h.status;
+  if (h.status < 0) {
+    r.error = (h.status == HTTPC_ERROR_READ_TIMEOUT) ? FetchError::Timeout : FetchError::Connect;
+  } else if (h.status == 403 && h.cfMitigated.equalsIgnoreCase("challenge")) {
+    r.error = FetchError::CfChallenge;
+  } else if (h.status == 401 || h.status == 403) {
+    r.error = FetchError::Auth;
+  } else if (h.status == 429) {
+    r.error = FetchError::RateLimited;
+    long ra = h.retryAfter.toInt();
+    if (ra > 0) r.retryAfterS = (uint32_t)ra;
+  } else if (h.status != 200) {
+    r.error = FetchError::Http;
+  } else if (h.overflow) {
+    r.error = FetchError::TooLarge;
+  } else {
+    r.body = h.body;
+  }
+  h.body = "";
+  return r;
+}
+
+// Gemini / ChatGPT / Grok keret-lekerdezese. Forras: PLAN.md 2.13/b.
+static ClaudeResponse fetchProvider(ClaudeTransport transport, const char *orgId, const char *access) {
+  ClaudeResponse r;
+  HttpHeaders hdr{{"Authorization", String("Bearer ") + access}};
+  HttpsResult h;
+  switch (transport) {
+    case ClaudeTransport::Gemini: {  // server.ts:367-374 retrieveUserQuota {project}
+      if (!orgId || !orgId[0]) {
+        r.error = FetchError::NotConfigured;  // a project-ID-t a scheduler szerzi be (loadCodeAssist)
+        return r;
+      }
+      JsonDocument req;
+      req["project"] = orgId;
+      String body;
+      serializeJson(req, body);
+      h = httpsRequest("gemini", "POST", String(GEMINI_API_BASE) + ":retrieveUserQuota", hdr, "application/json", body,
+                       CLAUDE_MAX_BODY_BYTES);
+      break;
+    }
+    case ClaudeTransport::ChatGpt:  // rate_limit_resets.rs:73-79; client.rs:249-268 (ChatGPT-Account-Id)
+      if (orgId && orgId[0]) hdr.push_back({"ChatGPT-Account-Id", String(orgId)});
+      h = httpsRequest("chatgpt", "GET", CHATGPT_USAGE_URL, hdr, nullptr, String(), CLAUDE_MAX_BODY_BYTES);
+      break;
+    case ClaudeTransport::Grok:  // CodexBar GrokCreditsProxyFetcher.swift:11, 26-27
+      hdr.push_back({"x-xai-token-auth", String("xai-grok-cli")});
+      h = httpsRequest("grok", "GET", GROK_BILLING_URL, hdr, nullptr, String(), CLAUDE_MAX_BODY_BYTES);
+      break;
+    default:
+      r.error = FetchError::NotConfigured;
+      return r;
+  }
+  return fromHttps(h);
+}
+
 ClaudeResponse fetchUsage(ClaudeTransport transport, const char *orgId, const char *auth) {
+  if (transport == ClaudeTransport::Gemini || transport == ClaudeTransport::ChatGpt || transport == ClaudeTransport::Grok) {
+    if (!auth || !auth[0]) {
+      ClaudeResponse r;
+      r.error = FetchError::NotConfigured;
+      return r;
+    }
+    return fetchProvider(transport, orgId, auth);
+  }
   ClaudeResponse r;
   const TransportSpec *ts = spec(transport);
   if (!ts || !auth || !auth[0] || (ts->needsOrgId && (!orgId || !isValidOrgId(orgId)))) {

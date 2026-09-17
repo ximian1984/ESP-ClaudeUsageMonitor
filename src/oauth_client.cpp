@@ -12,7 +12,7 @@
 
 // A platform.claude.com lanca ISRG X1/X2-re fut (PLAN 2.8), amit a CLAUDE_ROOT_CAS mar tartalmaz.
 
-static String randomBase64url(size_t nbytes) {
+String randomBase64url(size_t nbytes) {
   uint8_t buf[48];
   if (nbytes > sizeof(buf)) nbytes = sizeof(buf);
   esp_fill_random(buf, nbytes);
@@ -21,7 +21,7 @@ static String randomBase64url(size_t nbytes) {
   return String(out);
 }
 
-static String pkceChallenge(const String &verifier) {
+String pkceChallenge(const String &verifier) {
   uint8_t hash[32];
   mbedtls_sha256((const unsigned char *)verifier.c_str(), verifier.length(), hash, 0);  // 0 = SHA-256
   char out[48];
@@ -29,7 +29,7 @@ static String pkceChallenge(const String &verifier) {
   return String(out);
 }
 
-static String urlEncode(const String &s) {
+String urlEncode(const String &s) {
   static const char *hex = "0123456789ABCDEF";
   String o;
   o.reserve(s.length() * 3);
