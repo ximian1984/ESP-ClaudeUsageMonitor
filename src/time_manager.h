@@ -21,8 +21,10 @@ class TimeManager {
 
   // "HH:MM" helyi idoben (Europe/Budapest); ures, ha nincs ido.
   static String localHHMM(time_t t);
-  // "3d04h" / "02:17:32" formatum; "--" ha nem pozitiv.
+  // "3d04h" / "2h17m" / "17m32s" formatum; "--" ha nem pozitiv.
   static String formatRemaining(long seconds);
+  // A kijelzo reset-szovege, pl. "RESET 2h17m @09.17 18:40" (helyi idoben, mindig datummal).
+  static String resetText(time_t resetAt, bool synced, time_t now);
 
   // ISO-8601 UTC idobelyeg -> epoch. Elfogad: "YYYY-MM-DDTHH:MM:SS[.fff](Z|+HH:MM|-HH:MM)".
   // Altalanos segedfuggveny; hogy a Claude-valasz ilyen formatumot hasznal-e, az ⚠ [feltarando].

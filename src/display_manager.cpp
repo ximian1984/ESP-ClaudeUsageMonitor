@@ -72,7 +72,7 @@ void DisplayManager::drawNoProfiles() {
   text("http://" + wifiManager.ipString(), 0, 56, TFT_CYAN);
 }
 
-// Egy limit ket sora: "LABEL   73% LEFT" + (opcionalis savval) "RESET 02:17:32 @14:30" / "RESET 3d04h @09.24 09:00"
+// Egy limit ket sora: "LABEL   73% LEFT" + (opcionalis savval) "RESET 2h17m @09.17 18:40" / "RESET 3d04h @09.24 09:00"
 // Az ido a beallitott idozonaban (setup-oldal, NVS "tz").
 static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, bool bar, bool dataStale) {
   uint16_t valColor = dataStale ? TFT_DARKGREY : TFT_WHITE;
@@ -104,25 +104,33 @@ static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, boo
   int ry = y + (bar ? 24 : 17);
   if (!l->hasReset) {
     text("RESET n/a", 0, ry, TFT_DARKGREY);
-  } else if (!timeManager.synced()) {
-    text("RESET ? (NO TIME)", 0, ry, TFT_RED);  // NTP nelkul nincs hiteles visszaszamlalas
-  } else if (resetPassed) {
-    text("RESET PASSED - wait data", 0, ry, TFT_DARKGREY);  // spec 18.: nincs hamis countdown
   } else {
-    long secs = (long)(l->resetAt - now);
-    String when;
-    if (secs < 86400) {
-      when = TimeManager::localHHMM(l->resetAt);
-    } else {
-      struct tm lt;
-      time_t t = l->resetAt;
-      localtime_r(&t, &lt);
-      char buf[12];
-      strftime(buf, sizeof(buf), "%m.%d %H:%M", &lt);  // datum, nem angol napnev (projektgazda, 2026-09-17)
-      when = buf;
-    }
-    text("RESET " + TimeManager::formatRemaining(secs) + " @" + when, 0, ry, TFT_WHITE);
+    // Mindig datummal: "RESET 2h17m @09.17 18:40" (projektgazda, 2026-09-17). NTP nelkul "@... ?", lejartan PASSED.
+    uint16_t c = !timeManager.synced() ? TFT_RED : resetPassed ? TFT_DARKGREY : TFT_WHITE;
+    text(TimeManager::resetText(l->resetAt, timeManager.synced(), now), 0, ry, c);
   }
+}
+
+// Wi-Fi/adat nelkul: az utolso ismert keret-resetek (NVS). Pontos ido nelkul (ujrainditas utan nincs NTP) csak az
+// abszolut idopont latszik, visszaszamlalas es "lejart" itelet nem — azt nem tudhatjuk.
+static void lkBlock(const char *label, time_t reset, int y) {
+  text(label, 0, y, TFT_LIGHTGREY);
+  if (!reset) {
+    text("n/a", W, y, TFT_DARKGREY, 1, TR_DATUM);
+    return;
+  }
+  // "RESET 3d04h @09.24 09:00" a cimke alatt (egy sorba cimkevel nem ferne ki)
+  text(TimeManager::resetText(reset, timeManager.synced(), timeManager.now()), 0, y + 9, TFT_WHITE);
+}
+
+void DisplayManager::drawLastKnown(const char *name, const LastKnownResets &lk) {
+  text(name, 0, 0, TFT_CYAN, 2);
+  text(wifiManager.staConnected() ? "NO DATA" : "NO WIFI", W, 0, TFT_RED, 1, TR_DATUM);
+  // y: 0 nev | 17 SESSION | 26 reset | 40 WEEKLY | 49 reset | 64 "last known" + mentes ideje
+  lkBlock("SESSION (last known)", lk.sessionReset, 17);
+  lkBlock("WEEKLY (last known)", lk.weeklyReset, 40);
+  String saved = lk.savedEpoch >= 1704067200 ? TimeManager::localDateTime(lk.savedEpoch).substring(5) : String("?");
+  text("data from " + saved, 0, 68, TFT_DARKGREY);  // "data from 09-17 15:54" = 21 kar.
 }
 
 void DisplayManager::drawProfile(int idx, const char *name) {
@@ -166,6 +174,13 @@ void DisplayManager::drawProfile(int idx, const char *name) {
   if (status.length()) text(status, W, 0, sc, 1, TR_DATUM);
 
   if (!u.hasData) {
+    // Nincs friss adat, de van mentett reset-idopont: azt mutatjuk "waiting WiFi"/hiba helyett.
+    LastKnownResets lk = usageCache.lastKnown(idx);
+    if (lk.any() && (!wifiManager.staConnected() || u.lastError != FetchError::None || !timeManager.synced())) {
+      fb.fillSprite(TFT_BLACK);
+      drawLastKnown(name, lk);
+      return;
+    }
     // Nincs meg ervenyes adat: hibakepernyo (spec 17.) vagy varakozas.
     if (u.lastError == FetchError::None) {
       text(wifiManager.staConnected() ? (timeManager.synced() ? "loading..." : "waiting NTP") : "waiting WiFi", W / 2, 38,
@@ -189,15 +204,30 @@ void DisplayManager::loop() {
   _lastDrawMs = now;
   fb.fillSprite(TFT_BLACK);
 
-  if (wifiManager.apActive()) {
-    drawAp();
-    push();
-    return;
-  }
-
   ClaudeBrief b = configManager.brief();
   g_staleMs = 2UL * (uint32_t)b.refreshSec * 1000UL;
   int n = b.count;
+
+  // AP-mod: forced setupban csak a setup-kepernyo. Fallbackban (nincs Wi-Fi) a setup-kepernyo es az utolso ismert
+  // resetek valtakoznak (projektgazda, 2026-09-17), hogy Wi-Fi nelkul is latszodjon, mikor ujul a keret.
+  if (wifiManager.apActive()) {
+    bool anyLk = false;
+    for (int i = 0; i < n; i++) anyLk = anyLk || usageCache.lastKnown(b.idx[i]).any();
+    if (wifiManager.state() == WifiState::ApForced || !anyLk) {
+      drawAp();
+      push();
+      return;
+    }
+    if (now - _rotSinceMs >= (uint32_t)b.rotationSec * 1000UL) {
+      _rotSinceMs = now;
+      _rotPos++;
+    }
+    int slot = _rotPos % (n + 1);
+    if (slot == n) drawAp();
+    else drawProfile(b.idx[slot], b.name[slot]);
+    push();
+    return;
+  }
 
   if (n == 0) {
     if (wifiManager.staConnected()) drawNoProfiles();

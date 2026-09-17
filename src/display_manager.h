@@ -1,5 +1,6 @@
 // 160x80 ST7735 megjelenites. Csak a cache-bol es az allapotokbol rajzol, API-t soha nem hiv (spec 13.).
 #pragma once
+#include "usage_cache.h"
 #include <Arduino.h>
 
 class DisplayManager {
@@ -13,6 +14,7 @@ class DisplayManager {
   void drawWifiWait();
   void drawNoProfiles();
   void drawProfile(int idx, const char *name);
+  void drawLastKnown(const char *name, const LastKnownResets &lk);
   void push();
 
   int _rotPos = 0;

@@ -49,10 +49,12 @@ static uint32_t backoffMs(FetchError e, uint16_t failures, uint32_t periodMs) {
 static uint32_t profileIdentity(const ClaudeProfile &c) {
   if (!c.used) return 0;
   // FNV-1a a transport+org+auth-ra — csak osszehasonlitashoz, sehova nem kerul ki.
-  // A refresh tokent NEM vesszuk bele: a token-rotacio ne szamitson uj profilnak (kulonben nullaznank a cache-t).
+  // Tokent NEM vesszuk bele: OAuth-nal az access token minden refreshkor valtozik (~8 ora), ami eddig nullazta a
+  // cache-t. Helyette az editSeq: csak felhasznaloi mentesnel valtozik (config_manager), token-frissitesnel nem.
   uint32_t id = 2166136261UL;
   id = (id ^ c.transport) * 16777619UL;
-  for (const char *s : {c.orgId, "\x1f", c.auth})
+  id = (id ^ c.editSeq) * 16777619UL;
+  for (const char *s : {c.orgId, "\x1f", c.auth[0] ? "A" : "-"})
     for (const char *p = s; *p; p++) id = (id ^ (uint8_t)*p) * 16777619UL;
   return id;
 }

@@ -1,8 +1,50 @@
 #include "usage_cache.h"
 
+#include <Preferences.h>
+
 UsageCache usageCache;
 
-void UsageCache::begin() { _mtx = xSemaphoreCreateMutex(); }
+// Kulon NVS-namespace, hogy a konfig ("cmon") es a gyakrabban irt usage-adat ne keveredjen.
+static const char *NS_LK = "cmonlk";
+// Csak akkor irunk, ha az idopont ennyinel tobbet valtozott (a resets_at tort masodperce ne okozzon irast).
+static const long LK_WRITE_MIN_DELTA_S = 60;
+
+static String lkKey(int idx, char f) { return String("u") + idx + f; }
+
+void UsageCache::begin() {
+  _mtx = xSemaphoreCreateMutex();
+  Preferences p;
+  if (!p.begin(NS_LK, true)) return;  // meg nem letezik (elso inditas)
+  for (int i = 0; i < MAX_CLAUDE_PROFILES; i++) {
+    _lk[i].sessionReset = (time_t)p.getULong64(lkKey(i, 's').c_str(), 0);
+    _lk[i].weeklyReset = (time_t)p.getULong64(lkKey(i, 'w').c_str(), 0);
+    _lk[i].savedEpoch = (time_t)p.getULong64(lkKey(i, 't').c_str(), 0);
+  }
+  p.end();
+}
+
+LastKnownResets UsageCache::lastKnown(int idx) {
+  if (idx < 0 || idx >= MAX_CLAUDE_PROFILES) return LastKnownResets();
+  xSemaphoreTake(_mtx, portMAX_DELAY);
+  LastKnownResets c = _lk[idx];
+  xSemaphoreGive(_mtx);
+  return c;
+}
+
+void UsageCache::forgetLastKnown(int idx) {
+  if (idx < 0 || idx >= MAX_CLAUDE_PROFILES) return;
+  xSemaphoreTake(_mtx, portMAX_DELAY);
+  _lk[idx] = LastKnownResets();
+  xSemaphoreGive(_mtx);
+  Preferences p;
+  if (!p.begin(NS_LK, false)) return;
+  p.remove(lkKey(idx, 's').c_str());
+  p.remove(lkKey(idx, 'w').c_str());
+  p.remove(lkKey(idx, 't').c_str());
+  p.end();
+}
+
+static bool differs(time_t a, time_t b) { return labs((long)(a - b)) > LK_WRITE_MIN_DELTA_S; }
 
 ProfileUsage UsageCache::get(int idx) {
   if (idx < 0 || idx >= MAX_CLAUDE_PROFILES) return ProfileUsage();
@@ -24,7 +66,27 @@ void UsageCache::storeSuccess(int idx, const UsageData &d, time_t epochNow) {
   p.lastHttpStatus = 200;
   p.lastAttemptMs = p.lastOkMs;
   p.consecutiveFailures = 0;
+
+  LastKnownResets nk;
+  const UsageLimit *ls = d.find(LimitKind::Session);
+  const UsageLimit *lw = d.find(LimitKind::Weekly);
+  nk.sessionReset = (ls && ls->hasReset) ? ls->resetAt : 0;
+  nk.weeklyReset = (lw && lw->hasReset) ? lw->resetAt : 0;
+  nk.savedEpoch = epochNow;
+  bool write = differs(nk.sessionReset, _lk[idx].sessionReset) || differs(nk.weeklyReset, _lk[idx].weeklyReset);
+  _lk[idx] = nk;  // RAM-ban mindig friss; NVS-be csak valtozaskor (flash-kopas)
   xSemaphoreGive(_mtx);
+
+  if (write) {
+    Preferences pr;
+    if (pr.begin(NS_LK, false)) {
+      pr.putULong64(lkKey(idx, 's').c_str(), (uint64_t)nk.sessionReset);
+      pr.putULong64(lkKey(idx, 'w').c_str(), (uint64_t)nk.weeklyReset);
+      pr.putULong64(lkKey(idx, 't').c_str(), (uint64_t)nk.savedEpoch);
+      pr.end();
+      Serial.printf("[cache] profil %d: utolso ismert reset NVS-be mentve\n", idx);
+    }
+  }
 }
 
 void UsageCache::storeError(int idx, FetchError e, int httpStatus) {

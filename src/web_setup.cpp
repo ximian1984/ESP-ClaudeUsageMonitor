@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <WebServer.h>
 #include <esp_random.h>
+#include <utility>
 
 #include "admin_auth.h"
 #include "claude_client.h"
@@ -118,6 +119,16 @@ static void handleStatus() {
     o["lastOkAgoS"] = u.hasData ? (long)((millis() - u.lastOkMs) / 1000) : -1;
     o["lastError"] = fetchErrorTitle(u.lastError);
     o["httpStatus"] = u.lastHttpStatus;
+    // Pontosan a kijelzon latszo reset-szovegek (ellenorzeshez; titok nincs benne).
+    time_t tnow = timeManager.now();
+    bool syn = timeManager.synced();
+    for (const auto &kv : {std::make_pair(LimitKind::Session, "session"), std::make_pair(LimitKind::Weekly, "weekly")}) {
+      const UsageLimit *l = u.hasData ? u.data.find(kv.first) : nullptr;
+      if (l && l->hasReset) o[String(kv.second) + "Reset"] = TimeManager::resetText(l->resetAt, syn, tnow);
+    }
+    LastKnownResets lk = usageCache.lastKnown(i);
+    if (lk.sessionReset) o["lastKnownSessionReset"] = TimeManager::resetText(lk.sessionReset, syn, tnow);
+    if (lk.weeklyReset) o["lastKnownWeeklyReset"] = TimeManager::resetText(lk.weeklyReset, syn, tnow);
     if (u.lastOkEpoch > lastUpdate) lastUpdate = u.lastOkEpoch;
   }
   doc["lastClaudeUpdate"] = (long)lastUpdate;
@@ -275,6 +286,8 @@ static void handleClaudeSave() {
   strlcpy(p.orgId, org.c_str(), sizeof(p.orgId));
   p.enabled = argBool("enabled");
   if (!configManager.saveClaude(idx, p)) return sendError(500, "save failed");
+  // Mas fiok/ut lehet: a regi profil mentett reset-idopontjai nem ervenyesek. (Csak ha tenyleg valtozott a forras.)
+  if (!cfg.claude[idx].used || transportChanged || strcmp(cfg.claude[idx].orgId, org.c_str()) != 0) usageCache.forgetLastKnown(idx);
   JsonDocument doc;  // az idx kell a kliensnek: "Authenticate now" = mentes + azonnali login ugyanarra a profilra
   doc["ok"] = true;
   doc["idx"] = idx;
@@ -340,12 +353,14 @@ static void handleOAuthFinish() {
   g_login.verifier = "";  // titok torlese a RAM-bol
   g_login.state = "";
   if (!ok) return sendError(409, "profile changed during login, try again");
+  usageCache.forgetLastKnown(idx);  // uj bejelentkezes: lehet masik fiok
   sendOk();
 }
 
 static void handleClaudeDelete() {
   if (!guardPost()) return;
   if (!configManager.deleteClaude(argInt("idx", -1))) return sendError(400, "bad idx");
+  usageCache.forgetLastKnown(argInt("idx", -1));
   sendOk();
 }
 

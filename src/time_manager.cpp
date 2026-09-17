@@ -61,12 +61,26 @@ String TimeManager::localHHMM(time_t t) {
   return buf;
 }
 
+String TimeManager::resetText(time_t resetAt, bool synced, time_t now) {
+  struct tm lt;
+  time_t t = resetAt;
+  localtime_r(&t, &lt);
+  char when[16];
+  strftime(when, sizeof(when), "%m.%d %H:%M", &lt);  // HH.NN oo:pp — az ev nem fer ki, es nem is kell
+  if (!synced) return String("RESET @") + when + " ?";  // pontos ido nelkul nincs visszaszamlalas
+  long secs = (long)(resetAt - now);
+  if (secs <= 0) return String("RESET PASSED ") + when;
+  return "RESET " + formatRemaining(secs) + " @" + when;
+}
+
 String TimeManager::formatRemaining(long s) {
   if (s <= 0) return "--";
   char buf[16];
   long d = s / 86400, h = (s % 86400) / 3600, m = (s % 3600) / 60, sec = s % 60;
-  if (d > 0) snprintf(buf, sizeof(buf), "%ldd%02ldh", d, h);  // napos tavolsagnal a perc csak zsufol (160 px)
-  else snprintf(buf, sizeof(buf), "%02ld:%02ld:%02ld", h, m, sec);
+  // Rovid alak, hogy mellette MINDIG elferjen a "@HH.NN oo:pp" datum a 160 px-es sorban (projektgazda, 2026-09-17).
+  if (d > 0) snprintf(buf, sizeof(buf), "%ldd%02ldh", d, h);
+  else if (h > 0) snprintf(buf, sizeof(buf), "%ldh%02ldm", h, m);
+  else snprintf(buf, sizeof(buf), "%ldm%02lds", m, sec);
   return buf;
 }
 

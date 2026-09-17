@@ -19,7 +19,8 @@ int main(){
   CHECK(!TimeManager::parseIso8601("2026-09-16T17:19:17Zx",t));
   CHECK(TimeManager::formatRemaining(0)=="--");
   CHECK(TimeManager::formatRemaining(-5)=="--");
-  CHECK(TimeManager::formatRemaining(8252)=="02:17:32");
+  CHECK(TimeManager::formatRemaining(8252)=="2h17m");
+  CHECK(TimeManager::formatRemaining(1052)=="17m32s");
   CHECK(TimeManager::formatRemaining(3*86400+4*3600+12*60)=="3d04h");
   setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1); tzset();
   CHECK(TimeManager::localHHMM(1789579157)=="19:19");   // nyari ido: UTC+2
@@ -37,6 +38,12 @@ int main(){
   setenv("TZ","AEST-10AEDT,M10.1.0,M4.1.0/3",1); tzset(); CHECK(TimeManager::localDateTime(1768000000)=="2026-01-10 10:06");  // Australia/Sydney
   setenv("TZ","GMT0BST,M3.5.0/1,M10.5.0",1); tzset(); CHECK(TimeManager::localDateTime(1789579157)=="2026-09-16 18:19");  // Europe/London
   setenv("TZ","GMT0BST,M3.5.0/1,M10.5.0",1); tzset(); CHECK(TimeManager::localDateTime(1768000000)=="2026-01-09 23:06");  // Europe/London
+  setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1); tzset();
+  // 1789579157 = 2026-09-16T17:19:17Z = 19:19 helyi (CEST)
+  CHECK(TimeManager::resetText(1789579157, true, 1789579157-8252)=="RESET 2h17m @09.16 19:19");
+  CHECK(TimeManager::resetText(1789579157, true, 1789579157-(3*86400+4*3600))=="RESET 3d04h @09.16 19:19");
+  CHECK(TimeManager::resetText(1789579157, true, 1789579157+5)=="RESET PASSED 09.16 19:19");
+  CHECK(TimeManager::resetText(1789579157, false, 0)=="RESET @09.16 19:19 ?");
   CHECK(TimeManager::validPosixTz("CET-1CEST,M3.5.0,M10.5.0/3"));
   CHECK(TimeManager::validPosixTz("<+04>-4"));
   CHECK(!TimeManager::validPosixTz("CE"));
