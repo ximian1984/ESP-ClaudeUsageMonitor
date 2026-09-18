@@ -202,7 +202,9 @@ lásd 11.), engedélyezve. OAuth-nál a tokent a bejelentkezés adja; web-nél O
 
 ## 10. Display rotation
 
-A setup-oldal **Display & refresh** részén: profil-rotáció 1–60 s (alap 5 s), és a **usage-frissítés
+A setup-oldal **Display & refresh** részén: profil-rotáció 1–60 s (alap 5 s), **180°-os elforgatás** (ha fejjel lefelé áll
+a dongle; NVS `flip`, azonnal érvényes, `tft.setRotation(3)` — ⚠ [vason mérendő], hogy az ST7735-ofszetek forgatva is
+stimmelnek-e), és a **usage-frissítés
 profilonként 60–3600 s (alap 180 s)** — a usage lassan változik, a konzervatív alap kíméli a keretet és
 csökkenti a lábnyomot. A rotáció **csak a megjelenített profilt** cseréli, lekérést nem indít: 1 s-os
 rotációnál is a beállított frissítési idő marad. A „Claude requests since boot" számláló ezt mutatja.

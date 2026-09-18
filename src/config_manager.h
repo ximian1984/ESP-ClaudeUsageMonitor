@@ -34,6 +34,7 @@ struct DeviceConfig {
   ClaudeProfile claude[MAX_CLAUDE_PROFILES];
   uint8_t rotationSec = ROTATION_DEFAULT_S;
   uint16_t refreshSec = CLAUDE_REFRESH_DEFAULT_S;  // profilonkenti API-frissites (spec 14.)
+  bool displayFlip = false;  // kijelzo 180 fokkal elforgatva (projektgazda, 2026-09-18) — ahogy a dongle all
   char apPassword[16] = "";  // egyszer generalt, NVS-ben marad
   char tz[TZ_POSIX_MAX + 1] = TZ_EUROPE_BUDAPEST;  // POSIX TZ (a kijelzett helyi idohoz)
 };
@@ -45,6 +46,7 @@ struct ClaudeBrief {
   char name[MAX_CLAUDE_PROFILES][CLAUDE_NAME_MAX + 1];
   uint8_t rotationSec = ROTATION_DEFAULT_S;
   uint16_t refreshSec = CLAUDE_REFRESH_DEFAULT_S;
+  bool displayFlip = false;
 };
 
 class ConfigManager {
@@ -67,6 +69,7 @@ class ConfigManager {
   bool saveClaude(int idx, const ClaudeProfile &p);
   bool deleteClaude(int idx);
   bool saveRotation(uint8_t sec);
+  bool saveDisplayFlip(bool flip);
   bool saveRefreshSec(uint16_t sec);
   bool saveTimezone(const char *posixTz);
   ClaudeBrief brief();  // engedelyezett profilok neve+indexe, titok nelkul

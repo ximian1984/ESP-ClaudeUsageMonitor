@@ -70,6 +70,7 @@ void ConfigManager::load() {
   }
   _cfg.rotationSec = constrain(p.getUChar("rot", ROTATION_DEFAULT_S), ROTATION_MIN_S, ROTATION_MAX_S);
   _cfg.refreshSec = constrain((int)p.getUShort("refr", CLAUDE_REFRESH_DEFAULT_S), REFRESH_PERIOD_MIN_S, REFRESH_PERIOD_MAX_S);
+  _cfg.displayFlip = p.getBool("flip", false);
   if (p.isKey("tz") && p.getString("tz", _cfg.tz, sizeof(_cfg.tz)) == 0) strlcpy(_cfg.tz, TZ_EUROPE_BUDAPEST, sizeof(_cfg.tz));
 
   if (p.getString("appass", _cfg.apPassword, sizeof(_cfg.apPassword)) == 0 || strlen(_cfg.apPassword) < 8) {
@@ -114,11 +115,13 @@ bool ConfigManager::importAll(const DeviceConfig &in) {
   }
   _cfg.rotationSec = in.rotationSec;
   _cfg.refreshSec = in.refreshSec;
+  _cfg.displayFlip = in.displayFlip;
   strlcpy(_cfg.tz, in.tz, sizeof(_cfg.tz));
   Preferences p;
   p.begin(NS, false);
   p.putUChar("rot", _cfg.rotationSec);
   p.putUShort("refr", _cfg.refreshSec);
+  p.putBool("flip", _cfg.displayFlip);
   p.putString("tz", _cfg.tz);
   p.end();
   _version++;
@@ -213,6 +216,17 @@ bool ConfigManager::saveTimezone(const char *posixTz) {
   return true;
 }
 
+bool ConfigManager::saveDisplayFlip(bool flip) {
+  Lock l(_mtx);
+  _cfg.displayFlip = flip;
+  Preferences p;
+  p.begin(NS, false);
+  p.putBool("flip", flip);
+  p.end();
+  _version++;
+  return true;
+}
+
 bool ConfigManager::saveRotation(uint8_t sec) {
   if (sec < ROTATION_MIN_S || sec > ROTATION_MAX_S) return false;
   Lock l(_mtx);
@@ -242,6 +256,7 @@ ClaudeBrief ConfigManager::brief() {
   ClaudeBrief b;
   b.rotationSec = _cfg.rotationSec;
   b.refreshSec = _cfg.refreshSec;
+  b.displayFlip = _cfg.displayFlip;
   for (int i = 0; i < MAX_CLAUDE_PROFILES; i++) {
     const ClaudeProfile &c = _cfg.claude[i];
     if (!c.used || !c.enabled) continue;

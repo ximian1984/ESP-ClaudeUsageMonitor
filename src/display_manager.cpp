@@ -26,11 +26,21 @@ static void text(const String &s, int x, int y, uint16_t color, uint8_t font = 1
   fb.drawString(s, x, y, font);
 }
 
+// TFT_eSPI setRotation: 1 = fekvo (LilyGO examples/TFT_eSPI/TFT_eSPI.ino:35), 3 = ugyanaz 180 fokkal forgatva.
+// A framebuffer (sprite) valtozatlan marad, csak a kiirasa fordul — igy nem kell a rajzolo kodhoz nyulni.
+void DisplayManager::applyFlip(bool flip) {
+  if (_flip == (int)flip) return;
+  _flip = flip;
+  tft.setRotation(flip ? 3 : 1);
+  tft.fillScreen(TFT_BLACK);
+  Serial.printf("[disp] kijelzo-forgatas: %s\n", flip ? "180 fok" : "alap");
+}
+
 void DisplayManager::begin() {
   pinMode(PIN_LCD_BL, OUTPUT);
   digitalWrite(PIN_LCD_BL, LCD_BL_ON);
   tft.init();
-  tft.setRotation(1);  // fekvo 160x80 — LilyGO examples/TFT_eSPI/TFT_eSPI.ino:35
+  applyFlip(configManager.brief().displayFlip);
   tft.fillScreen(TFT_BLACK);
   fbOk = fb.createSprite(W, H) != nullptr;
   if (!fbOk) Serial.println("[disp] framebuffer foglalas sikertelen, kozvetlen rajzolas nincs — ures kijelzo");
@@ -229,6 +239,7 @@ void DisplayManager::loop() {
   fb.fillSprite(TFT_BLACK);
 
   ClaudeBrief b = configManager.brief();
+  applyFlip(b.displayFlip);  // a setup-oldalon barmikor atallithato
   g_staleMs = 2UL * (uint32_t)b.refreshSec * 1000UL;
   int n = b.count;
 

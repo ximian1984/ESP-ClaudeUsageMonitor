@@ -191,6 +191,7 @@ static void handleConfig() {
   }
   doc["rotationSec"] = cfg.rotationSec;
   doc["refreshSec"] = cfg.refreshSec;
+  doc["displayFlip"] = cfg.displayFlip;
   doc["tz"] = cfg.tz;
   doc["maxWifi"] = MAX_WIFI_PROFILES;
   doc["maxClaude"] = MAX_CLAUDE_PROFILES;
@@ -497,6 +498,7 @@ static void handleDisplay() {
   int sec = argInt("rotationSec", -1);
   if (sec < ROTATION_MIN_S || sec > ROTATION_MAX_S) return sendError(400, "rotation 1-60 sec");
   if (!configManager.saveRotation((uint8_t)sec)) return sendError(500, "save failed");
+  configManager.saveDisplayFlip(argBool("flip"));  // 180 fokos forgatas; azonnal ervenyes
   sendOk();
 }
 
@@ -594,6 +596,7 @@ static void buildExport(bool secrets, JsonDocument &doc) {
   }
   doc["rotationSec"] = cfg->rotationSec;
   doc["refreshSec"] = cfg->refreshSec;
+  doc["displayFlip"] = cfg->displayFlip;
   doc["tz"] = cfg->tz;
   Serial.printf("[web] export: %u Wi-Fi, %u Claude, titok=%s\n", (unsigned)wa.size(), (unsigned)ca.size(), secrets ? "igen" : "nem");
 }
@@ -755,6 +758,7 @@ static void handleImport() {
   if (refr < REFRESH_PERIOD_MIN_S || refr > REFRESH_PERIOD_MAX_S) return sendError(400, "refresh 60-3600 sec");
   nc->rotationSec = (uint8_t)rot;
   nc->refreshSec = (uint16_t)refr;
+  nc->displayFlip = in["displayFlip"] | cur->displayFlip;
   const char *tz = in["tz"] | cur->tz;
   if (!TimeManager::validPosixTz(tz)) return sendError(400, "invalid POSIX TZ");
   strlcpy(nc->tz, tz, sizeof(nc->tz));
