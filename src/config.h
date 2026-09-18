@@ -67,7 +67,16 @@ enum class ClaudeTransport : uint8_t {
 #define PROVIDER_ACCESS_DEFAULT_TTL_S 3600  // ha a token-valasz nem ad expires_in-t
 
 // --- Gemini (Google Code Assist; forras: google-gemini/gemini-cli @ 6a466a7e) ---
-// A kliens "installed application": a Google szabalya szerint a secret itt NEM titok (oauth2.ts:79-85 megjegyzese).
+// ⚠ DOKUMENTALT KIVETEL a "titok soha nem kerul commitba" szabaly alol (mérve 2026-09-18):
+// A lenti GEMINI_CLIENT_SECRET a NYILVANOS gemini-cli forrasbol valo, szo szerint:
+//   https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/core/src/code_assist/oauth2.ts
+//   (`OAUTH_CLIENT_SECRET`, commit 6a466a7e; a mi ertekunkkel bitre egyezik — ellenorizve).
+// Az upstream megjegyzese ott (oauth2.ts:79-85): "It's ok to save this in git because this is an installed
+// application ... the client secret is obviously not treated as a secret" (Google installed-app szabalya,
+// https://developers.google.com/identity/protocols/oauth2#installed).
+// Tehat NEM felhasznaloi titok es NEM a mienk: onmagaban nem ad hozzaferest semmihez (a felhasznalo hozzajarulasa
+// es a PKCE-verifier kell mellé). Nem kell forgatni; ha a Google mégis cserelne, innen frissitendo.
+// A VALODI titkok (access/refresh token, Wi-Fi- es admin-jelszo) tovabbra is CSAK az eszkoz NVS-eben vannak.
 #define GEMINI_CLIENT_ID     "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com"  // oauth2.ts:76
 #define GEMINI_CLIENT_SECRET "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"                                          // oauth2.ts:85
 #define GEMINI_AUTHORIZE_URL "https://accounts.google.com/o/oauth2/v2/auth"  // mert: 302 a Google-belepesre
