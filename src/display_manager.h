@@ -6,6 +6,9 @@
 class DisplayManager {
  public:
   void begin();
+  // A pillanatnyi framebuffer (RGB565, W*H uint16) a webes kijelzo-tukorhoz; nullptr, ha nincs sprite.
+  // Ugyanabban a taskban (loopTask) fut, mint a rajzolas, ezert nem kell zar.
+  const uint16_t *framebuffer(int &w, int &h) const;
   void showBoot(uint32_t msLeft);  // inditasi ablak: "BOOT = setup"
   void loop();                     // ~5 Hz ujrarajzolas + profil-rotacio
 

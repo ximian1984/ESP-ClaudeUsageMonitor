@@ -46,6 +46,12 @@ void DisplayManager::begin() {
   if (!fbOk) Serial.println("[disp] framebuffer foglalas sikertelen, kozvetlen rajzolas nincs — ures kijelzo");
 }
 
+const uint16_t *DisplayManager::framebuffer(int &w, int &h) const {
+  w = W;
+  h = H;
+  return fbOk ? (const uint16_t *)fb.getPointer() : nullptr;
+}
+
 void DisplayManager::push() {
   if (fbOk) fb.pushSprite(0, 0);
 }
@@ -92,9 +98,14 @@ static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, boo
     text("n/a", W, y, TFT_DARKGREY, 2, TR_DATUM);  // spec 16./25.: "ha az API biztositja"
     return;
   }
-  text(l->label, 0, y + 4, TFT_LIGHTGREY);
   time_t now = timeManager.now();
   bool resetPassed = l->hasReset && timeManager.synced() && l->resetAt <= now;
+  // A cimke (SESSION / WEEKLY / modellnev) szine a maradek szerint zoldbol pirosba megy at (projektgazda, 2026-09-18).
+  // Regi/lejart adatnal szurke marad: a szin ne sugalljon friss allapotot.
+  uint16_t labelColor = TFT_LIGHTGREY;
+  if (l->hasUtilization && !dataStale && !resetPassed)
+    labelColor = usageColor565(constrain(100.0f - l->utilizationPct, 0.0f, 100.0f));
+  text(l->label, 0, y + 4, labelColor);
 
   if (l->hasUtilization) {
     float left = constrain(100.0f - l->utilizationPct, 0.0f, 100.0f);
@@ -225,11 +236,12 @@ void DisplayManager::drawProfile(int idx, const char *name) {
     return;
   }
 
-  // Layout (y): 0 nev | 16 SESSION + sav 32..37 | 40 reset | 50 WEEKLY | 67 reset
+  // Layout (y): 0 nev | 16 SESSION (ertek 16..31, sav 32..37, reset 40..47) | 48 WEEKLY (48..63, sav 64..69, reset 72..79).
+  // A 80 px-es kijelzo igy pont ket savot fogad (projektgazda, 2026-09-18).
   drawLimit(u.data.find(LimitKind::Session), "SESSION", 16, true, stale);
   // Egyetlen limitet ado szolgaltatonal (pl. Grok CREDITS) ne legyen ures "WEEKLY n/a" blokk.
   if (u.data.find(LimitKind::Weekly) || u.data.count != 1)
-    drawLimit(u.data.find(LimitKind::Weekly), "WEEKLY", 50, false, stale);
+    drawLimit(u.data.find(LimitKind::Weekly), "WEEKLY", 48, true, stale);
 }
 
 void DisplayManager::loop() {

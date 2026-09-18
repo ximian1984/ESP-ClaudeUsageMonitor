@@ -2,6 +2,7 @@
 // A usage_parser tolti ki a valos valaszbol; a mezok jelentese itt NEM a Claude JSON-mezoinek neve.
 #pragma once
 #include <Arduino.h>
+#include <stdint.h>
 #include <time.h>
 
 #include "config.h"
@@ -60,3 +61,7 @@ enum class FetchError : uint8_t {
 };
 
 const char *fetchErrorTitle(FetchError e);  // kijelzo 1. sor, pl. "CLAUDE AUTH"
+
+// Keret-cimke szine a MARADEK szazalek szerint, folyamatos atmenettel (projektgazda, 2026-09-18):
+// 100 % -> zold, 50 % -> sarga, 0 % -> piros. RGB565 (a TFT_eSPI szinformatuma), host-tesztelheto.
+uint16_t usageColor565(float leftPct);

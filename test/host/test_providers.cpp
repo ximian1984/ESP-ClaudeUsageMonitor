@@ -75,6 +75,20 @@ int main() {
   CHECK(chatgptAccountIdFromIdToken(String("nincs-pont")) == "");
   CHECK(chatgptAccountIdFromIdToken(String("a.eyJmb28iOjF9.b")) == "");  // {"foo":1}: nincs claim
 
+  // ---- keret-cimke szine (RGB565): 100 % zold, 50 % sarga, 0 % piros, kozte atmenet
+  CHECK(usageColor565(100) == 0x07E0);  // tiszta zold
+  CHECK(usageColor565(50) == 0xFFE0);   // sarga
+  CHECK(usageColor565(0) == 0xF800);    // piros
+  CHECK(usageColor565(75) == 0x87E0);   // 75 %: r=128 (fel-piros), g=255 -> zoldes-sarga
+  // 25 %: teljes piros + fel-zold (narancs); a zold komponens kisebb, mint 50 %-nal
+  CHECK((usageColor565(25) & 0xF800) == 0xF800 && (usageColor565(25) & 0x07E0) < (usageColor565(50) & 0x07E0));
+  // monoton: tobb maradek -> nem kevesebb zold, nem tobb piros
+  for (int i = 0; i < 100; i++) {
+    CHECK((usageColor565((float)i) & 0x07E0) <= (usageColor565((float)i + 1) & 0x07E0));
+    CHECK((usageColor565((float)i) & 0xF800) >= (usageColor565((float)i + 1) & 0xF800));
+  }
+  CHECK(usageColor565(-5) == usageColor565(0) && usageColor565(150) == usageColor565(100));
+
   printf("providers fails=%d\n", fails);
   return fails;
 }

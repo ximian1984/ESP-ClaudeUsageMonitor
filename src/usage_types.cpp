@@ -1,5 +1,13 @@
 #include "usage_types.h"
 
+uint16_t usageColor565(float leftPct) {
+  float left = leftPct < 0 ? 0 : (leftPct > 100 ? 100 : leftPct);
+  // Also fel: zold -> sarga (a piros no), felso fel: sarga -> zold (a zold no). Igy a kozep tiszta sarga.
+  int r = left >= 50 ? (int)(255.0f * (100.0f - left) / 50.0f + 0.5f) : 255;
+  int g = left >= 50 ? 255 : (int)(255.0f * left / 50.0f + 0.5f);
+  return (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3));  // RGB565, kek = 0
+}
+
 const char *fetchErrorTitle(FetchError e) {
   switch (e) {
     case FetchError::None: return "";

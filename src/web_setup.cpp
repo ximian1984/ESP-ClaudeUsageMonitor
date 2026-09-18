@@ -11,6 +11,7 @@
 #include "claude_client.h"
 #include "config.h"
 #include "config_manager.h"
+#include "display_manager.h"
 #include "oauth_client.h"
 #include "provider_auth.h"
 #include "token_cache.h"
@@ -502,6 +503,23 @@ static void handleDisplay() {
   sendOk();
 }
 
+// A kijelzo pontos kepe (a TFT_eSPI sprite BAJTCSERELT RGB565-e, W*H szo; a kliens forditja vissza): a bongeszo ugyanazt rajzolja ki, mint ami az LCD-n van.
+// Belepve erheto el (guardRead). ~25,6 KB, darabokban kuldve (a WebServer String-buffere igy nem no meg).
+static void handleScreen() {
+  if (!guardRead()) return;
+  int w = 0, h = 0;
+  const uint16_t *fbuf = displayManager.framebuffer(w, h);
+  if (!fbuf) return sendError(503, "no framebuffer");
+  server.sendHeader("Cache-Control", "no-store");
+  server.sendHeader("X-Screen-Size", String(w) + "x" + String(h));
+  server.setContentLength((size_t)w * h * 2);
+  server.send(200, "application/octet-stream", "");
+  const size_t chunk = 2048;  // bajt
+  const char *p = (const char *)fbuf;
+  size_t total = (size_t)w * h * 2;
+  for (size_t off = 0; off < total; off += chunk) server.sendContent(p + off, min(chunk, total - off));
+}
+
 static void handleScanStart() {
   if (!guardPost()) return;
   wifiManager.requestScan();
@@ -832,6 +850,11 @@ void WebSetup::begin() {
   server.on("/api/login", HTTP_POST, handleLogin);
   server.on("/api/admin", HTTP_POST, handleAdminPassword);
   server.on("/api/export", HTTP_GET, handleExport);
+  server.on("/api/screen", HTTP_GET, handleScreen);
+  server.on("/screen", HTTP_GET, [] {  // onallo oldal (uj ablakban vagy kozvetlen URL-rol), belepessel
+    server.sendHeader("Cache-Control", "no-store");
+    server.send_P(200, "text/html; charset=utf-8", SCREEN_PAGE_HTML);
+  });
   server.on("/api/export-encrypted", HTTP_POST, handleExportEncrypted);
   server.on("/api/import", HTTP_POST, handleImport);
   server.onNotFound([] { server.send(404, "text/plain", "not found"); });

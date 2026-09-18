@@ -209,16 +209,25 @@ profilonként 60–3600 s (alap 180 s)** — a usage lassan változik, a konzerv
 csökkenti a lábnyomot. A rotáció **csak a megjelenített profilt** cseréli, lekérést nem indít: 1 s-os
 rotációnál is a beállított frissítési idő marad. A „Claude requests since boot" számláló ezt mutatja.
 
+**Kijelző-tükör a böngészőben** (projektgazda, 2026-09-18): a *Device* résznél **Open display mirror (live)**, vagy közvetlenül
+a `/screen` cím (külön ablakban is). A dongle a **valódi framebuffert** adja ki (`GET /api/screen`, 160×80 RGB565, 25 600 B,
+bájtcserélt — a kliens fordítja vissza), a böngésző 1 másodpercenként frissíti, felnagyítva. Belépés kell hozzá:
+token nélkül `401`, a `/screen` oldal ilyenkor jelszót kér. Mérve (2026-09-18): 25 600 B, a kép a kijelzővel egyező.
+
 Kijelző-elrendezés:
 
 ```
-xiTech                     12s
-SESSION             73% LEFT
-[██████████████░░░░░░░░░░░░░]
-RST 04:49:27 @09.17 21:00
-WEEKLY              59% LEFT
-RST 3d04:12:33 09.24 09:00
+xiTech                     12s      0   profilnév (+ jobb felül IP / állapot)
+SESSION             73% LEFT        16  cimke + maradék
+[██████████████░░░░░░░░░░░░░]       32  sáv
+RST 04:49:27 @09.17 21:00           40  reset
+WEEKLY              59% LEFT        48
+[████████████████████░░░░░░░]       64  sáv (2026-09-18 óta a hetinek is van)
+RST 3d04:12:33 09.24 09:00          72
 ```
+
+- A **cimke színe a maradék szerint** megy zöldből pirosba (100 % zöld, 50 % sárga, 0 % piros; `usageColor565`,
+  host-teszttel). Régi vagy lejárt adatnál szürke.
 
 - **Reset-sor:** hátralévő idő másodpercre járva, utána a reset **hó.nap óra:perc**-e helyi időben.
   - A kijelző 26 karakter széles. Napos visszaszámlálásnál a `@` elmarad, különben nem férne ki.

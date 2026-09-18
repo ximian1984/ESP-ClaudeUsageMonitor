@@ -24,6 +24,7 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
 
 <div id="main">
 <h2>Device</h2>
+<button type="button" class="primary" onclick="window.open('/screen','cmonScreen','width=700,height=460')">Open display mirror (live)</button>
 <table id="dev"></table>
 <button onclick="post('/api/restart',{}).then(()=>say('Restarting...'))">Restart</button>
 
@@ -329,4 +330,42 @@ function go(ev){ev.preventDefault();const b=new URLSearchParams();b.append('pass
     if(!j.ok){m(j.error||'Login failed');return}
     t=j.token;try{sessionStorage.setItem('sid',t)}catch(e){};document.getElementById('p').value='';ui()}).catch(()=>m('Not reachable'));return false}
 ui();
+</script></body></html>)HTML";
+
+// Kijelzo-tukor (projektgazda, 2026-09-18): ugyanaz a kep, mint az LCD-n, felnagyitva. Kulon URL: /screen.
+// Belepes nelkul csak jelszot ker (a munkamenet-token a sessionStorage-bol jon, ugyanarrol az originrol).
+static const char SCREEN_PAGE_HTML[] PROGMEM = R"HTML(<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Screen</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;padding:12px;background:#111;color:#eee;text-align:center}
+canvas{image-rendering:pixelated;width:100%;max-width:640px;border:2px solid #444;border-radius:6px;background:#000}
+input,button{font-size:1em;padding:10px;margin:6px 0;box-sizing:border-box;background:#222;color:#eee;border:1px solid #555;border-radius:4px}
+#m{min-height:1.2em;color:#fc6;font-size:.9em}#f{max-width:320px;margin:0 auto;display:none}
+</style></head><body>
+<canvas id="c" width="160" height="80"></canvas>
+<div id="m"></div>
+<form id="f" onsubmit="return go(event)"><input type="password" id="p" placeholder="Password" autocomplete="current-password" required><button type="submit">Login</button></form>
+<script>
+let t='';try{t=sessionStorage.getItem('sid')||''}catch(e){}
+const m=x=>document.getElementById('m').textContent=x;
+const ctx=document.getElementById('c').getContext('2d');
+let timer=null;
+// A TFT_eSPI sprite BAJTCSERELT RGB565-ot tarol (igy megy ki az SPI-re), ezert itt vissza kell forditani.
+function draw(buf){const u=new Uint8Array(buf);const img=ctx.createImageData(160,80);
+  for(let i=0;i<u.length/2;i++){const v=(u[i*2]<<8)|u[i*2+1];const r=(v>>11)&0x1f,g=(v>>5)&0x3f,b=v&0x1f;
+    img.data[i*4]=(r*255/31)|0;img.data[i*4+1]=(g*255/63)|0;img.data[i*4+2]=(b*255/31)|0;img.data[i*4+3]=255}
+  ctx.putImageData(img,0,0)}
+function tick(){fetch('/api/screen',{headers:t?{'X-CMon-Token':t}:{},cache:'no-store'}).then(r=>{
+    if(r.status===401){t='';try{sessionStorage.removeItem('sid')}catch(e){}
+      document.getElementById('f').style.display='block';m('Log in to see the display');return null}
+    if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer()})
+  .then(b=>{if(!b)return;draw(b);document.getElementById('f').style.display='none';m('live - '+new Date().toLocaleTimeString());
+    timer=setTimeout(tick,1000)})
+  .catch(e=>{m(e.message+' - retrying');timer=setTimeout(tick,3000)})}
+function go(ev){ev.preventDefault();const b=new URLSearchParams();b.append('password',document.getElementById('p').value);
+  fetch('/api/login',{method:'POST',headers:{'X-CMon':'1'},body:b}).then(r=>r.json()).then(j=>{
+    if(!j.ok){m(j.error||'Login failed');return}
+    t=j.token;try{sessionStorage.setItem('sid',t)}catch(e){}
+    document.getElementById('p').value='';if(timer)clearTimeout(timer);tick()}).catch(()=>m('Not reachable'));return false}
+tick();
 </script></body></html>)HTML";
