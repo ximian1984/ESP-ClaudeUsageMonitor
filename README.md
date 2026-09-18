@@ -1,15 +1,68 @@
 # Claude Usage Monitor — LILYGO T-Dongle-S3
 
-Önálló, USB-ről táplált kütyü. Wi-Fi-n közvetlenül a claude.ai-tól kéri le a Claude-használati kvótát, és a
-beépített 160×80-as kijelzőn váltogatja több Claude-fiók adatait. Nincs közbülső szerver.
+Önálló, USB-ről táplált kütyü: Wi-Fi-n **közvetlenül** kérdezi le, mennyi maradt az AI-előfizetésed keretéből, és a
+beépített 160×80-as kijelzőn mutatja. Nincs közbülső szerver, nincs felhős fiók: a tokenek az eszközön maradnak.
 
 Spec: [`../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md`](../ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md) ·
-Mért alapok, döntések: [`PLAN.md`](PLAN.md)
+Mért alapok, döntések: [`PLAN.md`](PLAN.md) · Változások: [`CHANGELOG.md`](CHANGELOG.md)
 
-> **Állapot (2026-09-17 este):** **Claude vason fut** (host): Wi-Fi, OAuth-login, usage-lekérés `HTTP 200` a kijelzőn;
-> titkosított export/import, lezárt setup-oldal (Playwright 25/25, 18/18). **ChatGPT, Gemini, Grok: megírva, fordul, host-teszt
-> zöld, vason MÉG NEM futott** (11., PLAN 2.13). Még nem mért: a Claude-token automatikus frissítése (~8 h), Wi-Fi nélküli képernyő.
-> Amit itt `⚠ [vason mérendő]` jelöl, az a forrásból következik, nem mérésből.
+> **Állapot (2026-09-18):** **a Claude-út vason fut**: Wi-Fi, OAuth-login, usage-lekérés `HTTP 200`, adat a kijelzőn;
+> titkosított export/import, lezárt setup-oldal, webes kijelző-tükör (Playwright 25/25 és 18/18).
+> **ChatGPT, Gemini, Grok: megírva, fordul, host-teszt zöld, vason MÉG NEM futott** (11.).
+> Még nem mért: a Claude-token automatikus frissítése (~8 óra), a Wi-Fi nélküli képernyő, a 180°-os forgatás képe.
+> Amit `⚠ [vason mérendő]` jelöl, az forrásból következik, nem mérésből.
+
+---
+
+## 0. Mit tud a kütyü
+
+**Egy mondatban:** bedugod egy USB-tápba, egyszer beállítod telefonról, és onnantól magától mutatja, mennyi van még hátra
+a keretedből és mikor újul meg.
+
+### Amit a kijelzőn látsz
+- Profilonként: a **név**, a **session (5 órás)** és a **heti** keret **maradék százaléka**, mindkettőhöz **sáv**, és hogy
+  **mikor újul meg** (visszaszámláló másodpercre + dátum: `RST 02:03:46 @09.18 12:30`).
+- A **címke színe** a maradék szerint zöldből sárgán át pirosba vált.
+- Több profil esetén **magától váltogat** (1–60 s, állítható).
+- A jobb felső sarok 3 másodpercenként az **IP-címet** és az **állapotot** mutatja (adat kora, `NO WIFI`, `ERR 403`…).
+- Wi-Fi nélkül vagy adat híján az **utolsó ismert reset-időpontokat** mutatja (ezek újraindítást is túlélnek).
+- Hiba esetén beszédes képernyő: `RE-LOGIN NEEDED`, `NO WIFI - SETUP` (a beállító Wi-Fi nevével és jelszavával), `NTP ERR`, …
+- A kijelző **180°-kal elforgatható**, ha fejjel lefelé áll a dongle.
+
+### Milyen fiókot kezel
+| Forrás | Bejelentkezés | Mit mutat | Állapot |
+|---|---|---|---|
+| **Claude** (claude.ai előfizetés) | on-device OAuth, PKCE: megnyitsz egy linket, jóváhagyod, a kapott kódot bemásolod | session + heti keret %-a és resetje | ✅ vason fut |
+| **ChatGPT** (Codex-keret) | eszközkód: a felület mutat egy rövid kódot, azt az OpenAI oldalán írod be | 5 órás + heti ablak %-a és resetje | ⚠ vason nem futott |
+| **Gemini** (Google AI / Code Assist) | Google-bejelentkezés, a kapott kódot bemásolod | modellenkénti maradék % és reset | ⚠ vason nem futott |
+| **Grok** (SuperGrok / Grok CLI) | eszközkód az xAI oldalán | credit-% és a periódus vége | ⚠ vason nem futott |
+| Claude web (`sessionKey`) | süti kézi bemásolása | mint a Claude-út | ⚠ 200-as válasz nem mért |
+
+Legfeljebb **5 AI-profil** (akár különböző szolgáltatóktól) és **20 Wi-Fi-profil** tárolható. A token az eszközön marad,
+és **magától frissül** — a bejelentkezést nem kell ismételgetni, amíg a frissítő token él.
+
+### Hálózat
+- **20 Wi-Fi-profil**, prioritással; induláskor és kapcsolatvesztéskor a legjobb elérhetőt választja, rossz jelszót
+  gyorsan felismer, és lép a következőre.
+- Ha egyik hálózat sem megy, **saját Wi-Fi-t nyit** (`ClaudeMonitor-XXXX`, WPA2, a jelszó a kijelzőn), és azon állítható be.
+- **NTP-óra** és állítható **időzóna** — a reset-időpontok helyi időben látszanak.
+
+### Beállítás és felügyelet böngészőből
+- Teljes **setup-felület** (telefonbarát): Wi-Fi- és AI-profilok, megjelenítés, időzóna, mentés/visszatöltés, admin-jelszó.
+- **Kijelző-tükör**: a `/screen` címen (külön ablakban is) pontosan az látszik, ami az LCD-n — a dongle a valódi
+  képpontokat küldi.
+- **Mentés/visszatöltés**: exportálható a teljes beállítás. Titkokkal együtt is, ilyenkor a fájlt a **dongle titkosítja**
+  az admin-jelszóval (PBKDF2 + AES-256-GCM); dongle nélkül is visszafejthető (`tools/decrypt_backup.py`).
+
+### Biztonság
+- A titkok (Wi-Fi-jelszó, tokenek) **csak az eszközön** vannak, a felület soha nem adja vissza őket, a napló nem írja ki.
+- Minden külső hívás **HTTPS**, beágyazott gyökértanúsítványokkal (`setInsecure()` nincs).
+- **Opcionális admin-jelszó**: ha be van állítva, se módosítani, se megnézni nem lehet a beállításokat belépés nélkül;
+  a nyitólap ilyenkor egy semleges bejelentkező oldal, ami magáról az eszközről semmit nem árul el.
+- Elfelejtett jelszó esetén a BOOT gombos beállító mód a helyreállítási út (fizikai hozzáférés kell hozzá).
+- ⚠ Az eszköz **sima HTTP**-t szolgál a helyi hálózaton: a jelszó és a bemásolt értékek titkosítatlanul utaznak odáig.
+- ⚠ A használt kvóta-végpontok **nem hivatalos** API-k, más kliensek OAuth-azonosítójával. Bármikor eltörhetnek, és a
+  szolgáltatási feltételekbe ütközhetnek; a Gemini-hez tartozó jogosultság a legszélesebb (lásd 11.).
 
 ---
 
@@ -420,14 +473,18 @@ a fájlok fejlécében; a jelszót fájlból olvassa (`CMON_PW_FILE`), a repóba
 
 ## 15. Ismert korlátozások
 
-- **Vason még semmi nem futott.** Nincs mérve: kijelző-orientáció, háttérfény-polaritás (a LilyGO
-  források ellentmondanak), TLS-kézfogás heap- és stackigénye, Wi-Fi-állapotgép, webszerver.
+- **Vason mérve (2026-09-17/18):** flash, kijelző, háttérfény, Wi-Fi-állapotgép, AP, webszerver, TLS, NTP,
+  Claude OAuth-login + usage-lekérés (`HTTP 200`), titkosított export/import, kijelző-tükör.
+- **Vason NEM mért:** a ChatGPT/Gemini/Grok utak (login, valós válaszalak, token-hosszak), a Claude-token automatikus
+  frissítése (~8 óra), a Wi-Fi nélküli „utolsó ismert reset" képernyő, a 180°-os forgatás képe, a `refresh_token` élettartama.
 - **Csak a sessionKey (claude.ai) tartalék-úton:** a Cloudflare dönthet úgy, hogy az ESP32-t nem engedi át (más
   TLS-ujjlenyomat, mint a curl-é). Az elsődleges OAuth-utat ez nem érinti: az eszköz ott csak az `api.anthropic.com`-ot
   és a `platform.claude.com`-ot hívja, ezek nem adnak kihívást (mérve), a login pedig a telefonon zajlik.
-- Az OAuth login/refresh **vason még nem futott**. A web (sessionKey) úton a `200`-as válasz nincs mérve.
-  A frissítő token élettartama feltárandó (addig nem tudni, mikor kell mégis újra belépni).
-- Nem hivatalos API: a Claude bármikor megváltoztathatja. A javítás helye a `claude_client` (`kTransports[]`) és a `usage_parser`.
+- A web (sessionKey) úton a `200`-as válasz nincs mérve.
+  A frissítő token élettartama feltárandó (a Mac-en mérve ~21,6 nap, de hogy az eszközön mikor kell mégis újra belépni, nyitott).
+- Nem hivatalos API-k (mind a négy szolgáltatónál): bármikor megváltozhatnak. A javítás helye a `claude_client`
+  (`kTransports[]`, `fetchProvider`), a `provider_auth` és a `usage_parser`.
+- 5 AI-profil a felső korlát, és az NVS mérete is határ: 20 Wi-Fi- + 5 token-profil elfér, ennél több már mérendő.
 - Rejtett (nem sugárzott) SSID nem támogatott.
 - A tanúsítványlánc gyökere változhat (Cloudflare kiadót válthat) → új gyökér a `src/ca_certs.h`-ba.
 - `time_t` 32 bites (Arduino-ESP32 2.0.17) → 2038-ig.
