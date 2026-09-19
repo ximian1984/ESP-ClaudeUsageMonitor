@@ -11,7 +11,7 @@
 DisplayManager displayManager;
 
 static TFT_eSPI tft;
-static TFT_eSprite fb(&tft);  // 160x80x16 bit = 25,6 KB framebuffer: villogasmentes ujrarajzolas
+static TFT_eSprite fb(&tft);  // 160x80x16 bit = 25,6 KB framebuffer: villogasmentes ujrarajzolas (CYD-n 2x-esen kiirva)
 static bool fbOk = false;
 
 static const int W = 160, H = 80;
@@ -28,6 +28,8 @@ static void text(const String &s, int x, int y, uint16_t color, uint8_t font = 1
 
 // TFT_eSPI setRotation: 1 = fekvo (LilyGO examples/TFT_eSPI/TFT_eSPI.ino:35), 3 = ugyanaz 180 fokkal forgatva.
 // A framebuffer (sprite) valtozatlan marad, csak a kiirasa fordul — igy nem kell a rajzolo kodhoz nyulni.
+// CYD: az 1/3 ott is a ket fekvo helyzet (TFT_Drivers/ILI9341_Rotation.h, ST7789_Rotation.h), de hogy melyik all
+// "jol" a lap USB-csatlakozojahoz kepest, az ⚠ [vason merendo] — a setup-oldali forgatas-pipa mindket esetet fedi.
 void DisplayManager::applyFlip(bool flip) {
   if (_flip == (int)flip) return;
   _flip = flip;
@@ -37,6 +39,13 @@ void DisplayManager::applyFlip(bool flip) {
 }
 
 void DisplayManager::begin() {
+#if defined(PIN_LED_R)
+  // A CYD RGB-LED-je aktiv alacsony (config.h): HIGH = ki.
+  for (int pin : {PIN_LED_R, PIN_LED_G, PIN_LED_B}) {
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, HIGH);
+  }
+#endif
   pinMode(PIN_LCD_BL, OUTPUT);
   digitalWrite(PIN_LCD_BL, LCD_BL_ON);
   tft.init();
@@ -52,8 +61,39 @@ const uint16_t *DisplayManager::framebuffer(int &w, int &h) const {
   return fbOk ? (const uint16_t *)fb.getPointer() : nullptr;
 }
 
+#if DISPLAY_SCALE > 1
+// Nagyobb panel (CYD: 320x240): a 160x80-as vaszon DISPLAY_SCALE-szeres egesz-skalazassal, kozepre igazitva.
+// Igy a rajzolo kod es a webes tukor (/api/screen) valtozatlan, a sprite 25,6 KB marad (egy 320x240x16 bites
+// sprite 150 KB lenne — a klasszikus ESP32 heapjen a TLS-kezfogas mellett nem biztonsagos; becsles, PLAN.md 2.15).
+// A sprite mar a vezetekre valo (bajtcserelt) sorrendben tarol, ezert a kiiras swap nelkul megy — ugyanigy tesz
+// a TFT_eSprite::pushSprite() is (TFT_eSPI Extensions/Sprite.cpp:665-668).
+static void pushScaled() {
+  static uint16_t line[W * DISPLAY_SCALE];
+  const int ow = W * DISPLAY_SCALE, oh = H * DISPLAY_SCALE;
+  const int x0 = (tft.width() - ow) / 2, y0 = (tft.height() - oh) / 2;
+  const uint16_t *src = (const uint16_t *)fb.getPointer();
+  bool oldSwap = tft.getSwapBytes();
+  tft.setSwapBytes(false);
+  tft.startWrite();
+  tft.setAddrWindow(x0, y0, ow, oh);
+  for (int y = 0; y < H; y++) {
+    const uint16_t *row = src + y * W;
+    for (int x = 0; x < W; x++)
+      for (int k = 0; k < DISPLAY_SCALE; k++) line[x * DISPLAY_SCALE + k] = row[x];
+    for (int k = 0; k < DISPLAY_SCALE; k++) tft.pushPixels(line, ow);
+  }
+  tft.endWrite();
+  tft.setSwapBytes(oldSwap);
+}
+#endif
+
 void DisplayManager::push() {
-  if (fbOk) fb.pushSprite(0, 0);
+  if (!fbOk) return;
+#if DISPLAY_SCALE > 1
+  pushScaled();
+#else
+  fb.pushSprite(0, 0);
+#endif
 }
 
 void DisplayManager::showBoot(uint32_t msLeft) {

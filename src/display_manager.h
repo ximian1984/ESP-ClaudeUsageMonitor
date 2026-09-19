@@ -1,4 +1,4 @@
-// 160x80 ST7735 megjelenites. Csak a cache-bol es az allapotokbol rajzol, API-t soha nem hiv (spec 13.).
+// 160x80-as logikai kijelzo (dongle: ST7735 1:1; CYD: 320x240-es panelen 2x-esen). Csak a cache-bol es az allapotokbol rajzol, API-t soha nem hiv (spec 13.).
 #pragma once
 #include "usage_cache.h"
 #include <Arduino.h>

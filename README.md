@@ -1,4 +1,4 @@
-# Claude Usage Monitor — LILYGO T-Dongle-S3
+# Claude Usage Monitor — LILYGO T-Dongle-S3 (és ESP32-2432S028R / CYD)
 
 Önálló, USB-ről táplált kütyü: Wi-Fi-n **közvetlenül** kérdezi le, mennyi maradt az AI-előfizetésed keretéből, és a
 beépített 160×80-as kijelzőn mutatja. Nincs közbülső szerver, nincs felhős fiók: a tokenek az eszközön maradnak.
@@ -11,6 +11,8 @@ Mért alapok, döntések: [`PLAN.md`](PLAN.md) · Változások: [`CHANGELOG.md`]
 > **ChatGPT, Gemini, Grok: megírva, fordul, host-teszt zöld, vason MÉG NEM futott** (11.).
 > Még nem mért: a Claude-token automatikus frissítése (~8 óra), a Wi-Fi nélküli képernyő, a 180°-os forgatás képe.
 > Amit `⚠ [vason mérendő]` jelöl, az forrásból következik, nem mérésből.
+> **ESP32-2432S028R (CYD), 2026-09-19:** két új env (`esp32-2432s028r` ILI9341, `esp32-2432s028r-st7789`), **tisztán
+> fordul, de fizikai lapon NEM futott** (2/b.).
 
 ---
 
@@ -89,6 +91,51 @@ A board-definíció a hivatalos LilyGO repóból van bemásolva: [`boards/dongle
 - `board = dongles3`, partíciók `default_16MB.csv`;
 - `TFT_eSPI 2.5.43`, a LilyGO `Setup209_LilyGo_T_Dongle_S3.h` értékeivel, build-flagként;
 - `ArduinoJson 7`.
+
+## 2/b. ESP32-2432S028R („Cheap Yellow Display", CYD) — második lapka, ⚠ vason NEM mért
+
+A firmware a CYD-re **is** fordul, külön PlatformIO env-vel. A dongle env-je (`t-dongle-s3`) nem változott, és továbbra is
+ez az alapértelmezett (`pio run`). A CYD-n a teljes Wi-Fi/HTTPS/OAuth/usage logika **ugyanaz a kód**. Csak a kijelző
+kiírása más: a 160×80-as képet 2×-es nagyításban rajzolja a 320×240-es panel közepére (fent és lent 40 px fekete sáv).
+A webes kijelző-tükör változatlanul a 160×80-as képet mutatja.
+
+> ⚠ **Fizikai CYD-lapon semmi nincs lemérve** (2026-09-19). A build tiszta, a beállítások három közösségi forrásból
+> jönnek (fájl:sor a [`PLAN.md`](PLAN.md) 2.15-ben). **Nyitott, és csak vason dől el:** a kijelző-driver, a színsorrend,
+> az invertálás, a forgatás iránya, a háttérfény szintje, és hogy a szabad heap elég-e a TLS-kézfogáshoz a klasszikus
+> ESP32-n.
+
+| | |
+|---|---|
+| SoC | ESP32-WROOM-32 (klasszikus ESP32), **4 MB** flash, PSRAM nincs; USB-soros: CH340 |
+| Kijelző | 2,8" 240×320 TFT, **ILI9341 vagy ST7789** (lap-revíziótól függ, lásd lent), HSPI |
+| Pinek | MISO 12, MOSI 13, SCLK 14, CS 15, DC 2, RST = a lap RST-je, háttérfény 21 (aktív HIGH) |
+| Gomb | BOOT (IO0), ugyanúgy, mint a dongle-on |
+| Nem használt | XPT2046 érintő (külön SPI: 25/32/33/36/39), SD, hangszóró, LDR; az RGB-LED-et (4/16/17, aktív LOW) induláskor kikapcsolja |
+| Partíciók | `min_spiffs.csv`: app 1,875 MB. A `default.csv` 1,25 MB-os app-helye 91,2 %-ig telt volna (mérve). |
+
+### Melyik env-et flasheljem?
+
+| A lapod | Env | Ha rossz a kép |
+|---|---|---|
+| **Egy micro-USB** csatlakozó (az eredeti CYD) | `esp32-2432s028r` (ILI9341) — **ezzel kezdd** | lásd a következő sort |
+| **Csak USB-C** (a rzeldent-féle „Rv2") | `esp32-2432s028r` (ILI9341) | Invertált színek (fekete háttér helyett fehér) → a env `build_flags`-éhez: `-DTFT_INVERSION_ON=1` |
+| **USB-C + micro-USB** („CYD2USB", „Rv3"), vagy „7789" felirat a dobozon | `esp32-2432s028r-st7789` | Piros és kék felcserélve → `-DTFT_RGB_ORDER=TFT_RGB`. Invertált színek → `-DTFT_INVERSION_ON=1` a `-DTFT_INVERSION_OFF=1` helyett. |
+
+A ST7789-es lap színsorrendjében **a források nem egyeznek**: a witnessmenow BGR-t ír, a rzeldent RGB-t. Az env a
+witnessmenow-féle beállítást követi. Ha a kép fejjel lefelé áll, azt a setup-oldal forgatás-pipája javítja, ugyanúgy,
+mint a dongle-on.
+
+```sh
+cd ClaudeUsageMonitor
+pio run -e esp32-2432s028r                                          # vagy: -e esp32-2432s028r-st7789
+pio run -e esp32-2432s028r -t upload --upload-port <a CH340 soros portja>
+```
+
+Mérve (2026-09-19, tiszta build, 0 warning): `esp32-2432s028r` RAM 71 184 B, Flash 1 195 453 B (60,8 %);
+`esp32-2432s028r-st7789` Flash 1 195 341 B.
+Feltöltési paraméterek (`envdump`): 460 800 baud, bootloader **`0x1000`** (nem `0x0`, mint az S3-on), partíciók `0x8000`,
+`boot_app0` `0xe000`, firmware `0x10000`. ⛔ A [`tools/flash.sh`](tools/flash.sh) **csak a dongle-ra** jó (esp32s3,
+16 MB, `0x0`).
 
 ## 3. PlatformIO telepítés
 
@@ -489,3 +536,6 @@ a fájlok fejlécében; a jelszót fájlból olvassa (`CMON_PW_FILE`), a repóba
 - A tanúsítványlánc gyökere változhat (Cloudflare kiadót válthat) → új gyökér a `src/ca_certs.h`-ba.
 - `time_t` 32 bites (Arduino-ESP32 2.0.17) → 2038-ig.
 - Nincs OTA-frissítés: firmware csak USB-n.
+- **CYD (ESP32-2432S028R):** csak build van, fizikai lapon semmi nem futott (2/b.). A kijelző 2×-es nagyítással mutatja a
+  160×80-as képet, a panel natív felbontását nem használja ki (egy külön, 320×240-es elrendezés későbbi lépés lehet).
+  Az érintőképernyő nincs használva.

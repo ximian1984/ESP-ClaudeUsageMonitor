@@ -1,4 +1,4 @@
-// LILYGO T-Dongle-S3 — Claude Usage Monitor
+// Claude Usage Monitor — LILYGO T-Dongle-S3 es ESP32-2432S028R (CYD); a lapkat a platformio.ini env-je valasztja (config.h)
 // Fo ciklus millis()-alapu, nem blokkol; a Claude-lekeres kulon FreeRTOS taskban fut (refresh_scheduler).
 #include <Arduino.h>
 
@@ -22,6 +22,7 @@ SET_LOOP_TASK_STACK_SIZE(16 * 1024);
 // az ESP32-S3 letoltesi modba lep, es a firmware el sem indul (docs/en/t-dongle-s3/REAMDE.MD,
 // "Do not press the BOOT button while powering on"). Ezert a gombot INDULAS UTAN, a kijelzon
 // jelzett BOOT_WINDOW_MS ablakban kell megnyomni; futas kozben BOOT_LONGPRESS_MS hosszu nyomas is jo.
+// A CYD-n ugyanez all: a BOOT gomb ott is az IO0 (witnessmenow PINS.md), a klasszikus ESP32 strapping-labe.
 static bool bootWindow() {
   uint32_t start = millis();
   while (millis() - start < BOOT_WINDOW_MS) {

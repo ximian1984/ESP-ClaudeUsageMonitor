@@ -8,6 +8,20 @@ hardveren még nem igazolt. A méréseket a [`PLAN.md`](PLAN.md) részletezi.
 
 ---
 
+## [Nem kiadott] – 2026-09-19
+
+### Hozzáadva
+- **Második lapka: ESP32-2432S028R („Cheap Yellow Display", CYD)**, két új PlatformIO env-vel:
+  `esp32-2432s028r` (ILI9341, az eredeti micro-USB-s lap) és `esp32-2432s028r-st7789` (a kétportos „CYD2USB"/„Rv3").
+  A Wi-Fi/HTTPS/OAuth/usage kód változatlan. A 160×80-as kép 2×-es nagyításban, a 320×240-es panel közepén jelenik meg.
+  A webes tükör ugyanaz. Partíciók: `min_spiffs.csv` (4 MB flash). Mindkét env tisztán fordul, 0 warning.
+  `[forrásból]`: **fizikai CYD-n nem futott.** A driver, a színsorrend, az invertálás és a forgatás `[vason mérendő]`
+  (README 2/b., PLAN 2.15).
+
+### Módosítva
+- `config.h`: a lapkafüggő állandók (`BOARD_NAME`, háttérfény-pin és -szint, `DISPLAY_SCALE`) a `BOARD_CYD` flag
+  szerint választódnak. A dongle-build kódja **bájtra azonos** a korábbival (`cmp`: csak az ELF-SHA és a kép-ellenőrzőösszeg tér el).
+
 ## [Nem kiadott] – 2026-09-18
 
 ### Hozzáadva

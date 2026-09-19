@@ -2,13 +2,28 @@
 #pragma once
 
 #define FW_VERSION "0.1.0"
-#define BOARD_NAME "LILYGO T-Dongle-S3"
 
+// --- Lapka-valasztas: a platformio.ini env-je adja (-DBOARD_CYD). A kijelzo SPI-pinjei ott vannak (TFT_eSPI). ---
+#if defined(BOARD_CYD)
+// ESP32-2432S028R ("Cheap Yellow Display"), klasszikus ESP32. Forras: witnessmenow/ESP32-Cheap-Yellow-Display
+// @ 0564a14 PINS.md es DisplayConfig/User_Setup.h; PLAN.md 2.15. ⚠ Fizikai lapon NEM mert.
+#define BOARD_NAME "ESP32-2432S028R (CYD)"
+#define PIN_LCD_BL 21     // User_Setup.h:131 TFT_BL; PINS.md "IO21 TFT_BL"
+#define LCD_BL_ON  HIGH   // User_Setup.h:132 TFT_BACKLIGHT_ON HIGH
+#define PIN_BOOT_BTN 0    // PINS.md "IO0 BOOT"
+// RGB-LED, aktiv alacsony (PINS.md "LEDs are active low"): indulaskor kikapcsoljuk, hogy ne vilagitson lebegve.
+#define PIN_LED_R 4
+#define PIN_LED_G 16
+#define PIN_LED_B 17
+#define DISPLAY_SCALE 2   // a 160x80-as logikai vaszon 2x-es kirajzolasa a 320x240-es panelre (display_manager.cpp)
+#else
+#define BOARD_NAME "LILYGO T-Dongle-S3"
 // --- Pinek: hivatalos LilyGO forras, ld. PLAN.md 1. ---
-// A kijelzo SPI-pinjei a platformio.ini build_flags-ben vannak (TFT_eSPI).
 #define PIN_LCD_BL 38     // factory_screen.ino:46
 #define LCD_BL_ON  LOW    // ⚠ [vason merendo] lcd.ino:96 szerint aktiv alacsony, factory_screen.ino:147 ellentmond
 #define PIN_BOOT_BTN 0    // docs Pins Map "Button 0"
+#define DISPLAY_SCALE 1
+#endif
 
 // --- Korlatok ---
 #define MAX_WIFI_PROFILES   20  // projektgazda (2026-09-17): hordozhato eszkoz, sok helyszin. Kulcsok "w19ssid" <= 15 kar.
