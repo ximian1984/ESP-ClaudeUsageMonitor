@@ -8,6 +8,22 @@ hardveren még nem igazolt. A méréseket a [`PLAN.md`](PLAN.md) részletezi.
 
 ---
 
+## [Nem kiadott] – 2026-09-19 (este)
+
+### Módosítva
+- **CYD: natív 320×240-es elrendezés** a 2×-es nagyítás helyett (projektgazda). Nagy szám a maradék %-ra, sáv, és
+  **nagy betűs visszaszámlálás** a reset dátumával. Fejléc: név + állapot, lábléc: setup-cím + profil-sorszám.
+  Teljes képernyős puffer nincs: egyetlen 320×40-es (25,6 KB) sáv-sprite rajzol hat menetben. A dongle kijelző-kódja
+  változatlan. `[forrásból]` + gépi render (`test/host/render_cyd.sh`), **vason nem futott**.
+- **Webes tükör a CYD-n: a teljes 320×240-es kép**, sávonként újrarajzolva és küldve (~150 KB/kép). A lap a méretet
+  az `X-Screen-Size` fejlécből veszi, a dongle-on marad a 160×80.
+
+### Hozzáadva
+- `/api/status` → `maxAllocHeap` (legnagyobb szabad heap-blokk), mindkét lapon. A CYD percenként naplózza a képidőt és
+  a heap-számokat is (a vason mérendő TLS-tartalékhoz, PLAN 2.16).
+- `test/host/render_cyd.sh`: a CYD-elrendezés PNG-be a Mac-en, a valódi rajzoló kóddal és a TFT_eSPI font-tábláival.
+  A panelt nem helyettesíti.
+
 ## [Nem kiadott] – 2026-09-19
 
 ### Hozzáadva

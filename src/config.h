@@ -15,14 +15,12 @@
 #define PIN_LED_R 4
 #define PIN_LED_G 16
 #define PIN_LED_B 17
-#define DISPLAY_SCALE 2   // a 160x80-as logikai vaszon 2x-es kirajzolasa a 320x240-es panelre (display_manager.cpp)
 #else
 #define BOARD_NAME "LILYGO T-Dongle-S3"
 // --- Pinek: hivatalos LilyGO forras, ld. PLAN.md 1. ---
 #define PIN_LCD_BL 38     // factory_screen.ino:46
 #define LCD_BL_ON  LOW    // ⚠ [vason merendo] lcd.ino:96 szerint aktiv alacsony, factory_screen.ino:147 ellentmond
 #define PIN_BOOT_BTN 0    // docs Pins Map "Button 0"
-#define DISPLAY_SCALE 1
 #endif
 
 // --- Korlatok ---

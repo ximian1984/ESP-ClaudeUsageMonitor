@@ -11,8 +11,8 @@ Mért alapok, döntések: [`PLAN.md`](PLAN.md) · Változások: [`CHANGELOG.md`]
 > **ChatGPT, Gemini, Grok: megírva, fordul, host-teszt zöld, vason MÉG NEM futott** (11.).
 > Még nem mért: a Claude-token automatikus frissítése (~8 óra), a Wi-Fi nélküli képernyő, a 180°-os forgatás képe.
 > Amit `⚠ [vason mérendő]` jelöl, az forrásból következik, nem mérésből.
-> **ESP32-2432S028R (CYD), 2026-09-19:** két új env (`esp32-2432s028r` ILI9341, `esp32-2432s028r-st7789`), **tisztán
-> fordul, de fizikai lapon NEM futott** (2/b.).
+> **ESP32-2432S028R (CYD), 2026-09-19:** két új env (`esp32-2432s028r` ILI9341, `esp32-2432s028r-st7789`), natív
+> 320×240-es elrendezéssel. **Tisztán fordul, gépi renderrel ellenőrzött, de fizikai lapon NEM futott** (2/b.).
 
 ---
 
@@ -96,8 +96,27 @@ A board-definíció a hivatalos LilyGO repóból van bemásolva: [`boards/dongle
 
 A firmware a CYD-re **is** fordul, külön PlatformIO env-vel. A dongle env-je (`t-dongle-s3`) nem változott, és továbbra is
 ez az alapértelmezett (`pio run`). A CYD-n a teljes Wi-Fi/HTTPS/OAuth/usage logika **ugyanaz a kód**. Csak a kijelző
-kiírása más: a 160×80-as képet 2×-es nagyításban rajzolja a 320×240-es panel közepére (fent és lent 40 px fekete sáv).
-A webes kijelző-tükör változatlanul a 160×80-as képet mutatja.
+más: **saját, natív 320×240-es (fekvő) elrendezése** van ([`src/display_cyd.cpp`](src/display_cyd.cpp)), nagyobb
+betűkkel:
+
+- **fejléc:** profilnév, jobbra az adat kora vagy a hiba (`ERR 429` + `7m OLD`);
+- **keretenként egy blokk:** a címke a maradék szerint színezve, jobbra nagy számmal a **maradék %**, alatta sáv, és a
+  **visszaszámlálás nagy betűvel**, mellette kicsiben a reset dátuma (`RST 02:17:32  @09.20 00:02`);
+- **lábléc:** a setup-oldal címe (`http://<IP>`), több profilnál a sorszám (`1/3`).
+
+A hibaképernyők (setup-AP, `RE-LOGIN NEEDED`, utolsó ismert resetek, betöltés) ugyanazok, mint a dongle-on, csak nagyobbak.
+
+| Két keret | Hiba régi adat felett | Setup-AP |
+|---|---|---|
+| ![két keret](docs/cyd/1_ket_keret.png) | ![hiba](docs/cyd/2_hiba_regi_adat.png) | ![setup-AP](docs/cyd/8_setup_ap.png) |
+
+> A képek **gépi renderek, nem fotók**: a valódi `display_cyd.cpp` fut a Mac-en, a TFT_eSPI saját font-tábláival
+> (`sh test/host/render_cyd.sh <mappa>`). Az elrendezés geometriáját mutatják (mi fér ki, mi hová kerül). A panelt
+> (driver, színek, fényerő, olvashatóság 2,8 hüvelyken) **nem**: az csak vason dől el.
+
+**Webes kijelző-tükör (`/screen`):** a CYD-n is a **teljes, pontos kép** jön, 320×240-ben. Teljes képernyős puffer
+nincs, ezért kérésre ugyanaz a rajzoló kód sávonként újra kirajzolja, és sávonként küldi el (6 × 25,6 KB = 153,6 KB
+képenként, másodpercenként egyszer, amíg a tükör nyitva van). A dongle-on marad a 160×80.
 
 > ⚠ **Fizikai CYD-lapon semmi nincs lemérve** (2026-09-19). A build tiszta, a beállítások három közösségi forrásból
 > jönnek (fájl:sor a [`PLAN.md`](PLAN.md) 2.15-ben). **Nyitott, és csak vason dől el:** a kijelző-driver, a színsorrend,
@@ -131,8 +150,8 @@ pio run -e esp32-2432s028r                                          # vagy: -e e
 pio run -e esp32-2432s028r -t upload --upload-port <a CH340 soros portja>
 ```
 
-Mérve (2026-09-19, tiszta build, 0 warning): `esp32-2432s028r` RAM 71 184 B, Flash 1 195 453 B (60,8 %);
-`esp32-2432s028r-st7789` Flash 1 195 341 B.
+Mérve (2026-09-19, tiszta build, 0 warning, natív elrendezéssel): `esp32-2432s028r` RAM 70 952 B, Flash 1 206 249 B
+(61,4 %); `esp32-2432s028r-st7789` Flash 1 206 145 B.
 Feltöltési paraméterek (`envdump`): 460 800 baud, bootloader **`0x1000`** (nem `0x0`, mint az S3-on), partíciók `0x8000`,
 `boot_app0` `0xe000`, firmware `0x10000`. ⛔ A [`tools/flash.sh`](tools/flash.sh) **csak a dongle-ra** jó (esp32s3,
 16 MB, `0x0`).
@@ -536,6 +555,5 @@ a fájlok fejlécében; a jelszót fájlból olvassa (`CMON_PW_FILE`), a repóba
 - A tanúsítványlánc gyökere változhat (Cloudflare kiadót válthat) → új gyökér a `src/ca_certs.h`-ba.
 - `time_t` 32 bites (Arduino-ESP32 2.0.17) → 2038-ig.
 - Nincs OTA-frissítés: firmware csak USB-n.
-- **CYD (ESP32-2432S028R):** csak build van, fizikai lapon semmi nem futott (2/b.). A kijelző 2×-es nagyítással mutatja a
-  160×80-as képet, a panel natív felbontását nem használja ki (egy külön, 320×240-es elrendezés későbbi lépés lehet).
-  Az érintőképernyő nincs használva.
+- **CYD (ESP32-2432S028R):** csak build és gépi render van, fizikai lapon semmi nem futott (2/b.). Nyitott: a
+  kijelző-driver és a színek, az olvashatóság, a képidő, és a heap-tartalék a TLS alatt. Az érintőképernyő nincs használva.

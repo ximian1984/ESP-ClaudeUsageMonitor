@@ -1,4 +1,4 @@
-// 160x80-as logikai kijelzo (dongle: ST7735 1:1; CYD: 320x240-es panelen 2x-esen). Csak a cache-bol es az allapotokbol rajzol, API-t soha nem hiv (spec 13.).
+// Kijelzo: dongle 160x80 ST7735 (display_manager.cpp), CYD nativ 320x240 (display_cyd.cpp). Csak a cache-bol es az allapotokbol rajzol, API-t soha nem hiv (spec 13.).
 #pragma once
 #include "usage_cache.h"
 #include <Arduino.h>
@@ -8,9 +8,16 @@ class DisplayManager {
   void begin();
   // A pillanatnyi framebuffer (RGB565, W*H uint16) a webes kijelzo-tukorhoz; nullptr, ha nincs sprite.
   // Ugyanabban a taskban (loopTask) fut, mint a rajzolas, ezert nem kell zar.
-  const uint16_t *framebuffer(int &w, int &h) const;
+  const uint16_t *framebuffer(int &w, int &h) const;  // CYD-n nincs teljes framebuffer -> streamScreen()
+#if defined(BOARD_CYD)
+  // CYD: a 320x240-es kepnek nincs teljes framebuffere (153,6 KB); a webes tukorhoz ugyanaz a rajzolo kod savonkent
+  // ujrarajzolja az aktualis kepet, es minden savot (bajtcserelt RGB565, sorfolytonos) atad a sinknek.
+  typedef void (*ScreenSink)(const uint8_t *data, size_t len);
+  bool screenSize(int &w, int &h) const;  // false, ha nincs sav-sprite
+  void streamScreen(ScreenSink sink);
+#endif
   void showBoot(uint32_t msLeft);  // inditasi ablak: "BOOT = setup"
-  void loop();                     // ~5 Hz ujrarajzolas + profil-rotacio
+  void loop();                     // ujrarajzolas (dongle ~5 Hz, CYD ~2 Hz) + profil-rotacio
 
  private:
   void drawAp();

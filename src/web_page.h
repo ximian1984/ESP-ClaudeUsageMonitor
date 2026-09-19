@@ -351,15 +351,19 @@ const m=x=>document.getElementById('m').textContent=x;
 const ctx=document.getElementById('c').getContext('2d');
 let timer=null;
 // A TFT_eSPI sprite BAJTCSERELT RGB565-ot tarol (igy megy ki az SPI-re), ezert itt vissza kell forditani.
-function draw(buf){const u=new Uint8Array(buf);const img=ctx.createImageData(160,80);
+// A meretet a X-Screen-Size fejlec adja (dongle 160x80, CYD 320x240).
+function draw(buf,w,h){const cv=document.getElementById('c');if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h}
+  const u=new Uint8Array(buf);const img=ctx.createImageData(w,h);
   for(let i=0;i<u.length/2;i++){const v=(u[i*2]<<8)|u[i*2+1];const r=(v>>11)&0x1f,g=(v>>5)&0x3f,b=v&0x1f;
     img.data[i*4]=(r*255/31)|0;img.data[i*4+1]=(g*255/63)|0;img.data[i*4+2]=(b*255/31)|0;img.data[i*4+3]=255}
   ctx.putImageData(img,0,0)}
 function tick(){fetch('/api/screen',{headers:t?{'X-CMon-Token':t}:{},cache:'no-store'}).then(r=>{
     if(r.status===401){t='';try{sessionStorage.removeItem('sid')}catch(e){}
       document.getElementById('f').style.display='block';m('Log in to see the display');return null}
-    if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer()})
-  .then(b=>{if(!b)return;draw(b);document.getElementById('f').style.display='none';m('live - '+new Date().toLocaleTimeString());
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const sz=(r.headers.get('X-Screen-Size')||'160x80').split('x').map(Number);
+    return r.arrayBuffer().then(b=>({b:b,w:sz[0],h:sz[1]}))})
+  .then(x=>{if(!x)return;draw(x.b,x.w,x.h);document.getElementById('f').style.display='none';m('live - '+new Date().toLocaleTimeString());
     timer=setTimeout(tick,1000)})
   .catch(e=>{m(e.message+' - retrying');timer=setTimeout(tick,3000)})}
 function go(ev){ev.preventDefault();const b=new URLSearchParams();b.append('password',document.getElementById('p').value);

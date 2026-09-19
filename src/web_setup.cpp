@@ -127,6 +127,7 @@ static void handleStatus() {
   doc["uptimeS"] = millis() / 1000;
   doc["freeHeap"] = ESP.getFreeHeap();
   doc["minFreeHeap"] = ESP.getMinFreeHeap();
+  doc["maxAllocHeap"] = ESP.getMaxAllocHeap();  // legnagyobb szabad blokk (a CYD TLS-tartalekahoz, PLAN.md 2.16)
   doc["loopStackFreeMin"] = uxTaskGetStackHighWaterMark(nullptr);  // a loopTask eletideje alatti legkisebb szabad stack (B)
   doc["claudeFetchCount"] = refreshScheduler.fetchCount();
 
@@ -505,9 +506,23 @@ static void handleDisplay() {
 
 // A kijelzo pontos kepe (a TFT_eSPI sprite BAJTCSERELT RGB565-e, W*H szo; a kliens forditja vissza): a bongeszo ugyanazt rajzolja ki, mint ami az LCD-n van.
 // Belepve erheto el (guardRead). ~25,6 KB, darabokban kuldve (a WebServer String-buffere igy nem no meg).
+#if defined(BOARD_CYD)
+static void sendScreenBand(const uint8_t *data, size_t len) { server.sendContent((const char *)data, len); }
+#endif
+
 static void handleScreen() {
   if (!guardRead()) return;
   int w = 0, h = 0;
+#if defined(BOARD_CYD)
+  // CYD: nincs teljes framebuffer (320x240x2 = 153,6 KB); ugyanaz a rajzolo kod savonkent (6 x 25,6 KB) adja a kepet.
+  if (!displayManager.screenSize(w, h)) return sendError(503, "no framebuffer");
+  server.sendHeader("Cache-Control", "no-store");
+  server.sendHeader("X-Screen-Size", String(w) + "x" + String(h));
+  server.setContentLength((size_t)w * h * 2);
+  server.send(200, "application/octet-stream", "");
+  displayManager.streamScreen(sendScreenBand);
+  return;
+#endif
   const uint16_t *fbuf = displayManager.framebuffer(w, h);
   if (!fbuf) return sendError(503, "no framebuffer");
   server.sendHeader("Cache-Control", "no-store");
