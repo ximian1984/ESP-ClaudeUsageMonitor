@@ -4,7 +4,7 @@
 
 #include "time_manager.h"
 
-// Forras: VALOS valasz, api.anthropic.com/api/oauth/usage, HTTP 200, 2026-09-16 (a koordinator merese),
+// Forras: VALOS valasz, api.anthropic.com/api/oauth/usage, HTTP 200, 2026-09-16 (merve),
 // test/host/fixtures/usage_oauth_2026-09-16.json. Mezok onnan:
 //   limits[]: {"kind":"session"|"weekly_all"|"weekly_scoped", "group":"session"|"weekly", "percent":26,
 //              "severity":"normal"|"warning", "resets_at":"2026-09-16T18:40:00.595003+00:00",

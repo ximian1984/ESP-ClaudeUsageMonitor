@@ -4,7 +4,7 @@ A [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) formátumot követi. 
 `0.1.0`: az alábbi dátumozott bejegyzések a fejlesztés menetét rögzítik, kiadás még nem volt.
 
 **Olvasási kulcs:** `[vason mérve]` = a dongle-on futott és megnéztük; `[forrásból]` = hivatalos kód/doksi alapján,
-hardveren még nem igazolt. A méréseket a [`PLAN.md`](PLAN.md) részletezi.
+hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletezi.
 
 ---
 
@@ -20,7 +20,7 @@ hardveren még nem igazolt. A méréseket a [`PLAN.md`](PLAN.md) részletezi.
 
 ### Hozzáadva
 - `/api/status` → `maxAllocHeap` (legnagyobb szabad heap-blokk), mindkét lapon. A CYD percenként naplózza a képidőt és
-  a heap-számokat is (a vason mérendő TLS-tartalékhoz, PLAN 2.16).
+  a heap-számokat is (a vason mérendő TLS-tartalékhoz).
 - `test/host/render_cyd.sh`: a CYD-elrendezés PNG-be a Mac-en, a valódi rajzoló kóddal és a TFT_eSPI font-tábláival.
   A panelt nem helyettesíti.
 
@@ -32,7 +32,7 @@ hardveren még nem igazolt. A méréseket a [`PLAN.md`](PLAN.md) részletezi.
   A Wi-Fi/HTTPS/OAuth/usage kód változatlan. A 160×80-as kép 2×-es nagyításban, a 320×240-es panel közepén jelenik meg.
   A webes tükör ugyanaz. Partíciók: `min_spiffs.csv` (4 MB flash). Mindkét env tisztán fordul, 0 warning.
   `[forrásból]`: **fizikai CYD-n nem futott.** A driver, a színsorrend, az invertálás és a forgatás `[vason mérendő]`
-  (README 2/b., PLAN 2.15).
+  (README 2/b.).
 
 ### Módosítva
 - `config.h`: a lapkafüggő állandók (`BOARD_NAME`, háttérfény-pin és -szint, `DISPLAY_SCALE`) a `BOARD_CYD` flag
@@ -65,7 +65,7 @@ hardveren még nem igazolt. A méréseket a [`PLAN.md`](PLAN.md) részletezi.
 - **GTS Root R1** a tanúsítványcsomagba (googleapis.com); mind a 9 használt hoszt `0 (ok)`. `[mérve]`
 - Az új szolgáltatóknál az access token **csak RAM-ban** (`token_cache`), az NVS-ben a refresh token és az
   account-/project-azonosító. Indulás után egy refresh pótolja.
-- Kutatás és forrás-ellenőrzés a PLAN-ben: 2.13 (terv), 2.13/b (forrás + mérés hamis tokennel), 2.12 (USB tethering),
+- Kutatás és forrás-ellenőrzés a belső tervdokumentációban: 2.13 (terv), 2.13/b (forrás + mérés hamis tokennel), 2.12 (USB tethering),
   2.14 (MikroTik USB-porton át távoli flash — félretéve).
 
 ### Javítva

@@ -127,7 +127,7 @@ static void handleStatus() {
   doc["uptimeS"] = millis() / 1000;
   doc["freeHeap"] = ESP.getFreeHeap();
   doc["minFreeHeap"] = ESP.getMinFreeHeap();
-  doc["maxAllocHeap"] = ESP.getMaxAllocHeap();  // legnagyobb szabad blokk (a CYD TLS-tartalekahoz, PLAN.md 2.16)
+  doc["maxAllocHeap"] = ESP.getMaxAllocHeap();  // legnagyobb szabad blokk (a CYD TLS-tartalekahoz, tervdoksi 2.16)
   doc["loopStackFreeMin"] = uxTaskGetStackHighWaterMark(nullptr);  // a loopTask eletideje alatti legkisebb szabad stack (B)
   doc["claudeFetchCount"] = refreshScheduler.fetchCount();
 

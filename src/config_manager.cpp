@@ -79,7 +79,7 @@ void ConfigManager::load() {
   }
   p.end();
   // Szandekosan nincs Serial-log a tartalomrol (spec 19.). Csak az NVS-foglaltsag (20 Wi-Fi-profil + 5 Claude-profil
-  // tokenekkel: a 0x5000-es nvs particio merete a korlat, ld. PLAN 2.11).
+  // tokenekkel: a 0x5000-es nvs particio merete a korlat, ld. tervdoksi 2.11).
   nvs_stats_t st;
   if (nvs_get_stats(nullptr, &st) == ESP_OK)
     Serial.printf("[config] NVS bejegyzes: %u foglalt, %u szabad, %u osszes\n", (unsigned)st.used_entries,

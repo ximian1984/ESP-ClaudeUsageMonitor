@@ -1,2 +1,48 @@
+# --- PlatformIO / build ---
 .pio/
+.pioenvs/
+.piolibdeps/
+*.elf
+*.bin
+*.hex
+*.map
+
+# --- Szerkesztő / IDE ---
 .vscode/
+.idea/
+*.code-workspace
+*.swp
+*~
+
+# --- Operációs rendszer ---
+.DS_Store
+Thumbs.db
+
+# ⛔ --- TITOK: soha ne kerüljön a repóba ---
+# A firmware minden hitelesítőt FUTÁSIDŐBEN kap (NVS, a setup-oldalról).
+# A forrásban egyetlen valós titok sincs, és nem is lehet (src/config.h:1).
+.env
+.env.*
+!.env.example
+secrets.*
+*.secret
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+credentials*.json
+
+# Az eszközről mentett beállítás-fájlok (a titkos export a Wi-Fi-jelszavakat
+# és a tokeneket is tartalmazza, akár titkosítva is — ld. README 13.)
+device-config-*.json
+
+# Az E2E-tesztek innen olvassák az admin-jelszót (CMON_PW_FILE), soha nem commitoljuk
+.cmon_pw
+*.pw
+
+# --- Teszt-melléktermékek ---
+node_modules/
+test/host/build/
+test/host/out/
+render_out/

@@ -6,7 +6,7 @@
 // --- Lapka-valasztas: a platformio.ini env-je adja (-DBOARD_CYD). A kijelzo SPI-pinjei ott vannak (TFT_eSPI). ---
 #if defined(BOARD_CYD)
 // ESP32-2432S028R ("Cheap Yellow Display"), klasszikus ESP32. Forras: witnessmenow/ESP32-Cheap-Yellow-Display
-// @ 0564a14 PINS.md es DisplayConfig/User_Setup.h; PLAN.md 2.15. ⚠ Fizikai lapon NEM mert.
+// @ 0564a14 PINS.md es DisplayConfig/User_Setup.h; tervdoksi 2.15. ⚠ Fizikai lapon NEM mert.
 #define BOARD_NAME "ESP32-2432S028R (CYD)"
 #define PIN_LCD_BL 21     // User_Setup.h:131 TFT_BL; PINS.md "IO21 TFT_BL"
 #define LCD_BL_ON  HIGH   // User_Setup.h:132 TFT_BACKLIGHT_ON HIGH
@@ -17,7 +17,7 @@
 #define PIN_LED_B 17
 #else
 #define BOARD_NAME "LILYGO T-Dongle-S3"
-// --- Pinek: hivatalos LilyGO forras, ld. PLAN.md 1. ---
+// --- Pinek: hivatalos LilyGO forras, ld. tervdoksi 1. ---
 #define PIN_LCD_BL 38     // factory_screen.ino:46
 #define LCD_BL_ON  LOW    // ⚠ [vason merendo] lcd.ino:96 szerint aktiv alacsony, factory_screen.ino:147 ellentmond
 #define PIN_BOOT_BTN 0    // docs Pins Map "Button 0"
@@ -33,7 +33,7 @@
 #define CLAUDE_AUTH_MAX 300  // Claude access token (mert: 108 kar.) / sessionKey — NVS-ben
 #define CLAUDE_REFRESH_MAX 512  // refresh token (Claude mert: 108; Google/OpenAI/xAI ⚠ [vason merendo]) — NVS-ben
 // Az uj szolgaltatok access tokenje CSAK RAM-ban (token_cache): a Google-e akar 2048 bajt, az OpenAI-e JWT;
-// 5 profil x 2 KB nem ferne a 0x5000-es NVS-be (PLAN 2.13/b). Inditas utan egy refresh potolja.
+// 5 profil x 2 KB nem ferne a 0x5000-es NVS-be (tervdoksi 2.13/b). Inditas utan egy refresh potolja.
 #define PROVIDER_ACCESS_MAX 2600
 #define CLAUDE_SCOPE_MAX 160 // OAuth scope-lista (az alap lista ~100 karakter)
 
@@ -52,7 +52,7 @@
 // --- Claude transport ---
 // Dontes (projektgazda, 2026-09-16): ELSODLEGES az OAuth (on-device login + auto-refresh), a sessionKey masodlagos.
 // Profilonkent valaszthato; a reszletek (host, path, fejlecek) egy helyen: claude_client.cpp kTransports[].
-// 2026-09-17: tovabbi szolgaltatok (projektgazda) — forras es meres: PLAN.md 2.13/b. Az NVS-ben a szam tarolodik,
+// 2026-09-17: tovabbi szolgaltatok (projektgazda) — forras es meres: tervdoksi 2.13/b. Az NVS-ben a szam tarolodik,
 // ezert a meglevo ertekek (0, 1) nem valtozhatnak.
 enum class ClaudeTransport : uint8_t {
   OAuth = 0,       // Claude: api.anthropic.com + OAuth Bearer — 200-as valasz mert (2026-09-16), vason fut (2026-09-17)
@@ -65,16 +65,16 @@ enum class ClaudeTransport : uint8_t {
 #define CLAUDE_TRANSPORT_DEFAULT ((uint8_t)ClaudeTransport::OAuth)
 
 // --- OAuth (on-device login PKCE + auto-refresh) ---
-// Forras: helyi Claude Code 2.1.273 binaris (sha256 953e9880...), PLAN.md 2.8. Vegpontok/CLIENT_ID/PKCE onnan.
+// Forras: helyi Claude Code 2.1.273 binaris (sha256 953e9880...), tervdoksi 2.8. Vegpontok/CLIENT_ID/PKCE onnan.
 // A refresh-logika mintaja: Data/erp-v1/.../Netatmo/NetatmoAccess.cs Refresh() (grant_type=refresh_token, mindharom
-// mezot frissiti+menti) — az elvet vettuk at, nem a C# szintaxist (PLAN.md 2.9).
+// mezot frissiti+menti) — az elvet vettuk at, nem a C# szintaxist (tervdoksi 2.9).
 #define OAUTH_TOKEN_HOST     "platform.claude.com"
 #define OAUTH_TOKEN_PATH     "/v1/oauth/token"
 #define OAUTH_AUTHORIZE_URL  "https://claude.com/cai/oauth/authorize"
 #define OAUTH_REDIRECT_URI   "https://platform.claude.com/oauth/code/callback"  // manualis; a callback kiirja a "code#state"-et
 #define OAUTH_CLIENT_ID      "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 #define OAUTH_SCOPES         "user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload user:plugins"
-#define OAUTH_REFRESH_MARGIN_S   300     // 5 perccel lejarat elott (a Claude Code isOAuthTokenExpired-je, PLAN 2.8)
+#define OAUTH_REFRESH_MARGIN_S   300     // 5 perccel lejarat elott (a Claude Code isOAuthTokenExpired-je, tervdoksi 2.8)
 #define OAUTH_REFRESH_RETRY_S    120     // atmeneti frissitesi hiba utan
 #define OAUTH_LOGIN_TTL_MS       900000  // fuggoben levo login (verifier/state vagy eszkozkod) elettartama (az OpenAI kodja 15 perc)
 #define PROVIDER_ACCESS_DEFAULT_TTL_S 3600  // ha a token-valasz nem ad expires_in-t
@@ -115,7 +115,7 @@ enum class ClaudeTransport : uint8_t {
 #define REFRESH_PERIOD_MIN_S      60
 #define REFRESH_PERIOD_MAX_S      3600
 #define CLAUDE_BACKOFF_MAX_S      1800   // atmeneti hibanal legfeljebb 30 perc
-#define CLAUDE_AUTH_BACKOFF_S     600    // 401/403: a szerver x-should-retry: false-t kuld (mert, PLAN.md 2.2)
+#define CLAUDE_AUTH_BACKOFF_S     600    // 401/403: a szerver x-should-retry: false-t kuld (mert, tervdoksi 2.2)
 #define CLAUDE_HTTP_TIMEOUT_MS    10000
 #define CLAUDE_MAX_BODY_BYTES     16384
 

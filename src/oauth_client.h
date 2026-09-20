@@ -1,5 +1,5 @@
-// On-device OAuth: PKCE-login + token-frissites. Vegpontok/CLIENT_ID/PKCE forrasa: Claude Code 2.1.273 (PLAN 2.8).
-// A refresh-elv mintaja: Netatmo/NetatmoAccess.cs Refresh() (PLAN 2.9). A titkot sehol nem logolja.
+// On-device OAuth: PKCE-login + token-frissites. Vegpontok/CLIENT_ID/PKCE forrasa: Claude Code 2.1.273 (tervdoksi 2.8).
+// A refresh-elv mintaja: Netatmo/NetatmoAccess.cs Refresh() (tervdoksi 2.9). A titkot sehol nem logolja.
 #pragma once
 #include <Arduino.h>
 
@@ -25,7 +25,7 @@ String pkceChallenge(const String &verifier);  // base64url(SHA-256(verifier))
 String urlEncode(const String &s);
 
 // PKCE-login inditasa: verifier+state+challenge generalas, authorize URL osszeallitasa.
-// A challenge = base64url(SHA-256(verifier)). Vason ellenorizve az RFC 7636 B. vektorral (PLAN 2.9).
+// A challenge = base64url(SHA-256(verifier)). Vason ellenorizve az RFC 7636 B. vektorral (tervdoksi 2.9).
 bool oauthBeginLogin(OAuthLogin &out);
 
 // A callback-oldalrol beirt "code#state" feldolgozasa: state-egyezes ellenorzese, majd kodcsere tokenre.

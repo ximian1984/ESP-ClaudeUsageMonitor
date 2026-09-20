@@ -9,7 +9,7 @@
 #include "https_util.h"
 
 // A body-t legfeljebb CLAUDE_MAX_BODY_BYTES-ig gyujti; ami folotte van, azt eldobja es jelzi.
-// (A valasz chunked — mert, PLAN.md 2.2 —, ezert a Content-Length nem hasznalhato elore.)
+// (A valasz chunked — mert, tervdoksi 2.2 —, ezert a Content-Length nem hasznalhato elore.)
 class LimitedStringSink : public Stream {
  public:
   LimitedStringSink(String &dst, size_t limit) : _dst(dst), _limit(limit) {}
@@ -32,7 +32,7 @@ class LimitedStringSink : public Stream {
   size_t _limit;
 };
 
-bool isValidOrgId(const char *s) {  // UUID-alak (a claude.ai path-validacioja szerint, PLAN.md 2.2)
+bool isValidOrgId(const char *s) {  // UUID-alak (a claude.ai path-validacioja szerint, tervdoksi 2.2)
   if (!s || strlen(s) != 36) return false;
   for (int i = 0; i < 36; i++) {
     char c = s[i];
@@ -47,8 +47,8 @@ bool isValidOrgId(const char *s) {  // UUID-alak (a claude.ai path-validacioja s
 // ---------------------------------------------------------------------------------------------
 
 // A) WebSession: claude.ai web.
-//    Mert (hamis ertekekkel, PLAN.md 2.1-2.3): HTTP/1.1-en atjut a Cloudflare-en; a "sessionKey=sk-ant-sid01-..."
-//    sutit kulon agon kezeli; OAuth-tokent a web vegpont elutasit ("oauth_token_not_accepted", a koordinator merese).
+//    Mert (hamis ertekekkel, tervdoksi 2.1-2.3): HTTP/1.1-en atjut a Cloudflare-en; a "sessionKey=sk-ant-sid01-..."
+//    sutit kulon agon kezeli; OAuth-tokent a web vegpont elutasit ("oauth_token_not_accepted", merve).
 //    Fejlecek forrasa: github.com/linuxlewis/claude-usage @ ac15351, UsageService.swift:30-31.
 //    ⚠ [feltarando] 200-as valasz ezen az uton meg nincs merve; az alak azonossaga az OAuth-valasszal feltetelezes.
 static void authWebSession(HTTPClient &http, const char *auth) {
@@ -59,9 +59,9 @@ static void authWebSession(HTTPClient &http, const char *auth) {
 
 // B) OAuth: api.anthropic.com.
 //    Mert: 200 + valos minta Bearer <oat01-token> + "anthropic-beta: oauth-2025-04-20" fejleccel, HTTP/1.1,
-//    Cloudflare-kihivas nelkul (a koordinator, 2026-09-16). Hamis tokennel (sajat meres, 2026-09-16): 401
+//    Cloudflare-kihivas nelkul (merve, 2026-09-16). Hamis tokennel (sajat meres, 2026-09-16): 401
 //    authentication_error "OAuth access token is invalid."; hitelesites nelkul 429 rate_limit_error + Retry-After.
-//    A token lejarat elotti frissitese NEM itt van: refresh_scheduler.cpp ensureOAuthToken() + oauth_client (PLAN 2.9).
+//    A token lejarat elotti frissitese NEM itt van: refresh_scheduler.cpp ensureOAuthToken() + oauth_client (tervdoksi 2.9).
 static void authOAuth(HTTPClient &http, const char *auth) {
   http.addHeader("anthropic-beta", "oauth-2025-04-20");
   String bearer = String("Bearer ") + auth;
@@ -124,7 +124,7 @@ static ClaudeResponse fromHttps(HttpsResult &h) {
   return r;
 }
 
-// Gemini / ChatGPT / Grok keret-lekerdezese. Forras: PLAN.md 2.13/b.
+// Gemini / ChatGPT / Grok keret-lekerdezese. Forras: tervdoksi 2.13/b.
 static ClaudeResponse fetchProvider(ClaudeTransport transport, const char *orgId, const char *access) {
   ClaudeResponse r;
   HttpHeaders hdr{{"Authorization", String("Bearer ") + access}};
@@ -184,7 +184,7 @@ ClaudeResponse fetchUsage(ClaudeTransport transport, const char *orgId, const ch
   http.setReuse(false);
   // HTTP/1.1 marad (alapertelmezett). Mert (claude.ai, sessionKey-ut): HTTP/1.1-en a Cloudflare atengedett, HTTP/2-n
   // kihivast adott. Az OAuth-ut (api.anthropic.com) HTTP/1.1-en kihivas nelkul valaszol.
-  // A User-Agent az alapertelmezett "ESP32HTTPClient" — curl-lal ezzel a UA-val mert atjutas (PLAN.md 2.1).
+  // A User-Agent az alapertelmezett "ESP32HTTPClient" — curl-lal ezzel a UA-val mert atjutas (tervdoksi 2.1).
 
   String url = String("https://") + ts->host + ts->pathPrefix;
   if (ts->needsOrgId) url += String(orgId) + ts->pathSuffix;

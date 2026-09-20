@@ -15,7 +15,7 @@ struct ClaudeResponse {
 const char *transportName(ClaudeTransport t);    // "web-session" / "oauth"
 bool transportNeedsOrgId(ClaudeTransport t);
 
-bool isValidOrgId(const char *orgId);  // UUID-alak (a szerver path-validacioja szerint, PLAN.md 2.2)
+bool isValidOrgId(const char *orgId);  // UUID-alak (a szerver path-validacioja szerint, tervdoksi 2.2)
 
 // Blokkolo (TLS-kezfogas + olvasas, legfeljebb ~CLAUDE_HTTP_TIMEOUT_MS) — ezert a refresh-taskbol hivando.
 ClaudeResponse fetchUsage(ClaudeTransport transport, const char *orgId, const char *auth);

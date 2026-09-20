@@ -1,6 +1,6 @@
 // JSON-valasz -> UsageData.
 //
-// A valos valasz (2026-09-16, api.anthropic.com/api/oauth/usage, PLAN.md 2.6) ket helyen adja ugyanazt:
+// A valos valasz (2026-09-16, api.anthropic.com/api/oauth/usage, tervdoksi 2.6) ket helyen adja ugyanazt:
 //   1) "limits": [{kind, group, percent, severity, resets_at, scope, is_active}, ...]  -> ELSODLEGES
 //   2) "five_hour" / "seven_day": {utilization, resets_at, ...}                          -> TARTALEK
 // Ismeretlen kulcsok, null codename-mezok nem zavarnak. Hibas JSON-ra nem omlik ossze.
@@ -30,7 +30,7 @@ enum class UsageSource : uint8_t {
 // Visszaad: None, ha legalabb a session- vagy a heti limit megvan; kulonben Parse.
 FetchError parseUsageUngated(const char *body, size_t len, UsageData &out, UsageSource &source);
 
-// Uj szolgaltatok (kapu NELKUL, host-tesztelheto). A valaszalak FORRASBOL van (PLAN 2.13/b), valos mintaval
+// Uj szolgaltatok (kapu NELKUL, host-tesztelheto). A valaszalak FORRASBOL van (tervdoksi 2.13/b), valos mintaval
 // MEG NEM igazolt ⚠ [vason merendo]. A kijelzo ket helyere (Session/Weekly "slot") a ket legfontosabb limit kerul,
 // sajat cimkevel; a tobbi LimitKind::Other.
 //   Gemini : buckets[]{modelId, tokenType, remainingFraction, resetTime} -> hasznalt % = (1 - remainingFraction) * 100

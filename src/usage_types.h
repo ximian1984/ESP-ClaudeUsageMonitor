@@ -47,7 +47,7 @@ enum class FetchError : uint8_t {
   NoTime,          // nincs NTP-ido (TLS-ervenyesseghez kell)
   Connect,         // DNS/TCP/TLS hiba ("internet unavailable")
   Timeout,
-  CfChallenge,     // Cloudflare kihivas (cf-mitigated: challenge) — a claude.ai sessionKey-uton mert, PLAN.md 2.1;
+  CfChallenge,     // Cloudflare kihivas (cf-mitigated: challenge) — a claude.ai sessionKey-uton mert, tervdoksi 2.1;
                    // az OAuth-ut hosztjai (api.anthropic.com, platform.claude.com) nem adnak kihivast
   Auth,            // 401/403 JSON hibaval
   RateLimited,     // 429

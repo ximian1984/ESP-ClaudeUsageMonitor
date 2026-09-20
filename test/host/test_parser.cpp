@@ -1,6 +1,7 @@
 // Host-teszt: usage_parser.
-// Elsodleges minta: VALOS valasz, api.anthropic.com/api/oauth/usage, 2026-09-16 (a koordinator merese),
-//   fixtures/usage_oauth_2026-09-16.json — szo szerint, PII nelkul.
+// Elsodleges minta: egy VALOS valasz ALAKJA, api.anthropic.com/api/oauth/usage, 2026-09-16,
+//   fixtures/usage_oauth_2026-09-16.json. A szerkezet szo szerinti, a szamok KITALALTAK (nincs benne
+//   valos kvota-adat es nincs PII).
 // Masodlagos: github.com/linuxlewis/claude-usage @ ac15351, ClaudeUsageTests.swift:35-42 (csak top-level alak).
 #include "usage_parser.h"
 #include "time_manager.h"
@@ -23,16 +24,16 @@ int main() {
   std::stringstream ss;
   ss << f.rdbuf();
   std::string real = ss.str();
-  CHECK(real.size() == 3180);
+  CHECK(real.size() == 3179);
   CHECK(P(real, d, src) == FetchError::None);
   CHECK(src == UsageSource::LimitsArray);
   CHECK(d.count == 3);
   const UsageLimit *s = d.find(LimitKind::Session);
   const UsageLimit *w = d.find(LimitKind::Weekly);
-  CHECK(s && s->hasUtilization && s->utilizationPct == 26.0f);
+  CHECK(s && s->hasUtilization && s->utilizationPct == 34.0f);
   CHECK(s && s->hasReset && s->resetAt == iso("2026-09-16T18:40:00Z"));
   CHECK(s && s->severity == Severity::Normal && !s->isActive);
-  CHECK(w && w->utilizationPct == 81.0f && w->resetAt == iso("2026-09-18T07:00:00Z"));
+  CHECK(w && w->utilizationPct == 68.0f && w->resetAt == iso("2026-09-18T07:00:00Z"));
   CHECK(w && w->severity == Severity::Warning && w->isActive);
   CHECK(!strcmp(d.limits[2].label, "7D FABLE") && d.limits[2].kind == LimitKind::Other && d.limits[2].utilizationPct == 0.0f);
   CHECK(d.limits[0].kind == LimitKind::Session && d.limits[1].kind == LimitKind::Weekly);
@@ -48,8 +49,8 @@ int main() {
     CHECK(d.count == 2);
     s = d.find(LimitKind::Session);
     w = d.find(LimitKind::Weekly);
-    CHECK(s && s->utilizationPct == 26.0f && s->resetAt == iso("2026-09-16T18:40:00Z") && s->severity == Severity::None);
-    CHECK(w && w->utilizationPct == 81.0f && w->resetAt == iso("2026-09-18T07:00:00Z"));
+    CHECK(s && s->utilizationPct == 34.0f && s->resetAt == iso("2026-09-16T18:40:00Z") && s->severity == Severity::None);
+    CHECK(w && w->utilizationPct == 68.0f && w->resetAt == iso("2026-09-18T07:00:00Z"));
   }
 
   // --- 3. linuxlewis teszt-minta (top-level, limits nelkul) ---

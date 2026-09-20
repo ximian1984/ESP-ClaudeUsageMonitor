@@ -1,6 +1,6 @@
 {
   "five_hour": {
-    "utilization": 26.0,
+    "utilization": 34.0,
     "resets_at": "2026-09-16T18:40:00.595003+00:00",
     "limit_dollars": null,
     "used_dollars": null,
@@ -8,7 +8,7 @@
     "locked_reason": null
   },
   "seven_day": {
-    "utilization": 81.0,
+    "utilization": 68.0,
     "resets_at": "2026-09-18T07:00:00.595032+00:00",
     "limit_dollars": null,
     "used_dollars": null,
@@ -56,7 +56,7 @@
     {
       "kind": "session",
       "group": "session",
-      "percent": 26,
+      "percent": 34,
       "severity": "normal",
       "resets_at": "2026-09-16T18:40:00.595003+00:00",
       "scope": null,
@@ -65,7 +65,7 @@
     {
       "kind": "weekly_all",
       "group": "weekly",
-      "percent": 81,
+      "percent": 68,
       "severity": "warning",
       "resets_at": "2026-09-18T07:00:00.595032+00:00",
       "scope": null,
@@ -113,22 +113,22 @@
       {
         "key": "claude_code",
         "display_name": "Claude Code",
-        "percent": 100
+        "percent": 92
       },
       {
         "key": "chat",
         "display_name": "Chats",
-        "percent": 0
+        "percent": 5
       },
       {
         "key": "cowork",
         "display_name": "Cowork",
-        "percent": 0
+        "percent": 2
       },
       {
         "key": "other",
         "display_name": "Other",
-        "percent": 0
+        "percent": 1
       }
     ]
   }

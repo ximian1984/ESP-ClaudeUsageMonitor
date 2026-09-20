@@ -188,7 +188,7 @@ void WifiManager::loop() {
       onScanDone(n);
     } else if (n == WIFI_SCAN_FAILED && millis() - _scanStartMs < WIFI_SCAN_TIMEOUT_MS) {
       // Az Arduino-core (2.0.17) sajat idokorlatja max_ms_per_chan*20 = 6 s (WiFiScan.cpp:63,144), utana -2-t ad,
-      // pedig a scan fut tovabb. Vason mert: 6,76 s, 21 talalat (PLAN 2.11). A kesz esemeny utan a core ujra a
+      // pedig a scan fut tovabb. Vason mert: 6,76 s, 21 talalat (tervdoksi 2.11). A kesz esemeny utan a core ujra a
       // talalatszamot adja (_scanDone nullazza a _scanStarted-et), ezert a -2-t a sajat korlatunkig "fut"-nak vesszuk.
     } else if (n == WIFI_SCAN_FAILED) {
       Serial.printf("[wifi] scan HIBA, %lu ms, cel %s\n", (unsigned long)(millis() - _scanStartMs),

@@ -1,4 +1,4 @@
-// Szolgaltatonkenti login / token-frissites (Claude, Gemini, ChatGPT, Grok). Forras es meres: PLAN.md 2.13/b.
+// Szolgaltatonkenti login / token-frissites (Claude, Gemini, ChatGPT, Grok). Forras es meres: tervdoksi 2.13/b.
 //   Claude  : PKCE, kezi "code#state" (oauth_client.*)
 //   Gemini  : PKCE, kezi "code" (codeassist.google.com/authcode), form-kodolt token-kerés client_secret-tel
 //   ChatGPT : OpenAI-fele eszkozkod (deviceauth/usercode -> deviceauth/token -> oauth/token), JWT-bol account-ID

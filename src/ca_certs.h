@@ -11,7 +11,7 @@
 //   GTS Root R1  D9:47:43:2A:BD:E7:B7:FA:90:FC:2E:6B:59:10:1B:12:80:E0:E1:C7:E4:E4:0F:A3:C6:88:7F:FF:57:A7:F4:CF (lejar 2036-06-22)
 // Tovabbi hosztok (2026-09-17, a negyes csomaggal mind 0 (ok)): chatgpt.com, auth.openai.com, auth.x.ai,
 //   cli-chat-proxy.grok.com (WE1 <- GTS R4); cloudcode-pa.googleapis.com, oauth2.googleapis.com (WR2 <- GTS R1).
-// Ha a kiado valtozik, ide kell uj gyoker (ld. PLAN.md 3.).
+// Ha a kiado valtozik, ide kell uj gyoker (ld. tervdoksi 3.).
 #pragma once
 
 static const char CLAUDE_ROOT_CAS[] PROGMEM =

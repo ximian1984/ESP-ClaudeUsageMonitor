@@ -41,7 +41,7 @@ HttpsResult httpsRequest(const char *logTag, const char *method, const String &u
   http.setConnectTimeout(CLAUDE_HTTP_TIMEOUT_MS);
   http.setTimeout(CLAUDE_HTTP_TIMEOUT_MS);
   http.setReuse(false);
-  // HTTP/1.1 (alapertelmezett), UA "ESP32HTTPClient": ezzel mert kihivas-mentes valasz minden hasznalt hoszton (PLAN 2.13/b).
+  // HTTP/1.1 (alapertelmezett), UA "ESP32HTTPClient": ezzel mert kihivas-mentes valasz minden hasznalt hoszton (tervdoksi 2.13/b).
   if (!http.begin(tls, url)) {
     r.status = HTTPC_ERROR_CONNECTION_REFUSED;
     Serial.printf("[%s] %s: begin hiba\n", logTag, method);

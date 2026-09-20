@@ -1,7 +1,7 @@
 // ESP32-2432S028R (CYD) nativ 320x240-es (fekvo) megjelenites. A dongle 160x80-as utja: display_manager.cpp.
 // Csak a cache-bol es az allapotokbol rajzol, API-t soha nem hiv (spec 13.).
 //
-// Memoria (PLAN.md 2.16): NINCS teljes kepernyos sprite (320x240x16 bit = 153,6 KB). Egyetlen 320x40-es
+// Memoria (tervdoksi 2.16): NINCS teljes kepernyos sprite (320x240x16 bit = 153,6 KB). Egyetlen 320x40-es
 // sav-sprite (25,6 KB, annyi, mint a dongle framebuffere) jarja vegig a hat savot: savonkent a TELJES elrendezes
 // ujrarajzolodik a sav eltolasaval, a sprite a kilogo reszt levagja (a karakterrajzolas vagott agon pixelenkent
 // rajzol: TFT_eSPI Extensions/Sprite.cpp drawChar). Villogasmentes, es a webes tukor ugyanigy, savonkent kapja a kepet.
@@ -362,7 +362,7 @@ void DisplayManager::begin() {
   applyFlip(configManager.brief().displayFlip);
   tft.fillScreen(TFT_BLACK);
   bandOk = band.createSprite(W, BAND_H) != nullptr;
-  // A heap-szamok a vason merendo TLS-tartalekhoz (PLAN.md 2.16): a legnagyobb szabad blokk a lenyeges.
+  // A heap-szamok a vason merendo TLS-tartalekhoz (tervdoksi 2.16): a legnagyobb szabad blokk a lenyeges.
   Serial.printf("[disp] CYD %dx%d, sav-sprite %dx%d %s; heap szabad %u B, legnagyobb blokk %u B\n", W, H, W, BAND_H,
                 bandOk ? "ok" : "SIKERTELEN", (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 }

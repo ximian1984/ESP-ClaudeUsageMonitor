@@ -1,4 +1,4 @@
-// RAM-beli access-token tar az uj szolgaltatokhoz (Gemini/ChatGPT/Grok). NVS-be nem kerul (meret, PLAN 2.13/b):
+// RAM-beli access-token tar az uj szolgaltatokhoz (Gemini/ChatGPT/Grok). NVS-be nem kerul (meret, tervdoksi 2.13/b):
 // ujrainditas utan a refresh tokenbol potlodik. Titok: soha nem logolva, a feluletre nem kerul.
 #pragma once
 #include <Arduino.h>

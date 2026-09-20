@@ -21,7 +21,7 @@ uint32_t g_hostMillis = 1000000;
 std::vector<uint16_t> g_screen(320 * 240);
 
 // --- A kijelzo altal hasznalt modulok stubjai (a valodi .cpp-k NVS-t / Wi-Fi-t / mutexet hasznalnak) ---
-static String g_ip = "192.168.x.x";
+static String g_ip = "192.168.100.111";
 static ClaudeBrief g_brief;
 static ProfileUsage g_pu;
 static LastKnownResets g_lk;

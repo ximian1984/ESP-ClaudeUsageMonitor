@@ -10,7 +10,7 @@
 #include "ca_certs.h"
 #include "config.h"
 
-// A platform.claude.com lanca ISRG X1/X2-re fut (PLAN 2.8), amit a CLAUDE_ROOT_CAS mar tartalmaz.
+// A platform.claude.com lanca ISRG X1/X2-re fut (tervdoksi 2.8), amit a CLAUDE_ROOT_CAS mar tartalmaz.
 
 String randomBase64url(size_t nbytes) {
   uint8_t buf[48];

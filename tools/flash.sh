@@ -1,5 +1,5 @@
 #!/bin/sh
-# ClaudeUsageMonitor — feltoltes PlatformIO NELKUL (pl. host), a mashol leforditott binarisokbol.
+# ClaudeUsageMonitor — feltoltes PlatformIO NELKUL (pl. egy masik Mac), a mashol leforditott binarisokbol.
 # A parameterek a `pio run -t envdump` UPLOADERFLAGS-abol (2026-09-17): esp32s3, 921600, dio, 80m, 16MB,
 # 0x0 bootloader / 0x8000 partitions / 0xe000 boot_app0 / 0x10000 firmware. (qio -> dio: platform main.py _get_board_flash_mode)
 # Hasznalat:  sh flash.sh                 -> kiirja a soros portokat

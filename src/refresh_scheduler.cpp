@@ -17,7 +17,7 @@ RefreshScheduler refreshScheduler;
 
 // ⚠ [vason merendo] a TLS-kezfogas stackigenye; a token-frissites es a usage-lekeres kulon TLS-kapcsolat.
 // 16 KB: a run() DeviceConfig-masolatot (~4,7 KB) tart a stacken a TLS-hivasok alatt (a loopTask 8 KB-ja emiatt
-// tulcsordult, PLAN 2.11). A tenyleges maradekot a fetch utani naplo mutatja (stack HWM).
+// tulcsordult, tervdoksi 2.11). A tenyleges maradekot a fetch utani naplo mutatja (stack HWM).
 static const uint32_t TASK_STACK = 16384;
 static const uint32_t PARSER_PENDING_RETRY_MS = 300000UL;
 

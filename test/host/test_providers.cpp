@@ -1,5 +1,5 @@
 // Host-teszt: Gemini / ChatGPT / Grok parser + JWT account-ID + base64url-dekodolas.
-// ⚠ A mintak SZINTETIKUSAK: a mezoneveket es tipusokat a FORRASBOL vettuk (PLAN 2.13/b), valos valasz meg nincs.
+// ⚠ A mintak SZINTETIKUSAK: a mezoneveket es tipusokat a FORRASBOL vettuk (tervdoksi 2.13/b), valos valasz meg nincs.
 //   Gemini : gemini-cli packages/core/src/code_assist/types.ts:250-265 (BucketInfo)
 //   ChatGPT: codex codex-backend-openapi-models rate_limit_status_payload.rs / _details.rs / _window_snapshot.rs
 //   Grok   : CodexBar GrokCreditsProxyFetcher.swift:44-120 (CreditsResponse)

@@ -1,7 +1,7 @@
 #!/bin/sh
 # Setup-API probe az "Authenticate now" utra: TESZT OAuth-profil mentese -> /api/oauth/start -> URL-ellenorzes -> torles.
 # Tokent nem kap, bejelentkezes nincs; a code_challenge/state csak hosszal jelenik meg.
-# Hasznalat: sh test_oauth_start.sh 192.168.x.x
+# Hasznalat: sh test_oauth_start.sh 192.168.100.111
 B="http://$1"
 r=$(curl -s -m 10 -X POST -H "X-CMon: 1" --data-urlencode name=TESZT --data-urlencode transport=oauth \
   --data-urlencode enabled=0 --data-urlencode idx=-1 "$B/api/claude")

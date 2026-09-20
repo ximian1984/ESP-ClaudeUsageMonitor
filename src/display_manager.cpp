@@ -174,7 +174,7 @@ void DisplayManager::drawProfile(int idx, const char *name) {
   uint32_t now = millis();
 
   // Felso sor: profilnev (mindig lathato, spec 12.) + jobb sarokban FELVALTVA az IP-cim es az allapot
-  // (projektgazda, 2026-09-17). Mert szelessegek (TFT_eSPI widtbl_f16 + 6 px/kar.): "192.168.x.x" 90 px,
+  // (projektgazda, 2026-09-17). Mert szelessegek (TFT_eSPI widtbl_f16 + 6 px/kar.): "192.168.100.111" 90 px,
   // "xiTech" 2-es betuvel 39 px, 12 szeles karakter 120 px -> hosszu nevnel az IP-fazisban a nev kisebb betuvel,
   // szukseg eseten csonkitva jelenik meg.
   String ip = wifiManager.staConnected() ? wifiManager.ipString() : String();
