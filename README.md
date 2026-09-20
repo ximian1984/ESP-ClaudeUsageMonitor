@@ -4,6 +4,10 @@ A self-contained, USB-powered gadget that asks **directly over Wi-Fi** how much 
 quota, and shows it on its built-in display. No intermediate server, no cloud account: **your tokens never leave
 the device.**
 
+![Claude Usage Monitor on a LilyGO T-Dongle-S3 — SESSION 95% left, WEEKLY 9% left](docs/device.jpg)
+
+> 🤖 **Vibecoded end-to-end with [Claude](https://claude.com/claude-code).** The firmware, the tooling and this documentation were all designed and written with Claude.
+
 🇭🇺 *Magyar változat: [`README.hu.md`](README.hu.md)* ·
 Spec: [`docs/ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md`](docs/ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md) ·
 Changes: [`CHANGELOG.md`](CHANGELOG.md)

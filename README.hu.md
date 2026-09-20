@@ -3,6 +3,10 @@
 Önálló, USB-ről táplált kütyü: Wi-Fi-n **közvetlenül** kérdezi le, mennyi maradt az AI-előfizetésed keretéből, és a
 beépített 160×80-as kijelzőn mutatja. Nincs közbülső szerver, nincs felhős fiók: a tokenek az eszközön maradnak.
 
+![Claude Usage Monitor egy LilyGO T-Dongle-S3-on — SESSION 95%, WEEKLY 9% maradék](docs/device.jpg)
+
+> 🤖 **Végig Claude-dal „vibecode-olva” ([Claude](https://claude.com/claude-code)).** A firmware, az eszközök és ez a dokumentáció is Claude-dal készült.
+
 🇬🇧 *English version (primary): [`README.md`](README.md)* ·
 Spec: [`docs/ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md`](docs/ESP32_S3_Claude_Usage_Monitor_Brief_FINAL.md) ·
 Változások: [`CHANGELOG.md`](CHANGELOG.md)
