@@ -234,10 +234,10 @@ sprite is recreated at 240×40 (19.2 KB) and a frame is 8 bands.
 buffer, so on request the same drawing code redraws it band by band and sends it band by band (6 × 25.6 KB = 153.6 KB
 per frame, once a second while the mirror is open). The dongle stays at 160×80.
 
-![The CYD running portrait (90°): SESSION 7% used, WEEKLY 69% used](docs/cyd/photo_cyd_portrait.jpg)
+![The CYD running portrait (90°): SESSION used 16%, WEEKLY used 72%, remaining bars](docs/cyd/photo_cyd_portrait.jpg)
 
-*Photo, 2026-09-21: the CYD in portrait (90°), `esp32-2432s028r-inv`. The same moment on claude.ai: session 7 % used,
-weekly (all models) 69 % used.*
+*Photo, 2026-09-21 20:15: the CYD in portrait (90°), `esp32-2432s028r-inv`: `SESSION used 16%` (the `remaining` bar
+84 %, green), `WEEKLY used 72%` (the bar 28 %, turning yellow).*
 
 **Measured on hardware (2026-09-21)**, on a USB-C + micro-USB board (ESP32-D0WD-V3 rev 3.1, 4 MB, CH340):
 
