@@ -200,7 +200,8 @@ más: **saját, natív 320×240-es (fekvő) elrendezése** van ([`src/display_cy
 betűkkel:
 
 - **fejléc:** profilnév, jobbra az adat kora vagy a hiba (`ERR 429` + `7m OLD`);
-- **keretenként egy blokk:** a címke a maradék szerint színezve, jobbra nagy számmal a **maradék %**, alatta sáv, és a
+- **keretenként egy blokk:** a címke a maradék szerint színezve, jobbra nagy számmal a **maradék %**, alatta sáv (SESSION:
+  a **fogyás**, zöldből pirosba menő színátmenettel; WEEKLY: a **maradék**, egy tónussal, ami fogyva zöldből pirosba vált), és a
   **visszaszámlálás nagy betűvel**, mellette kicsiben a reset dátuma (`RST 02:17:32  @09.20 00:02`);
 - **lábléc:** a setup-oldal címe (`http://<IP>`), több profilnál a sorszám (`1/3`).
 

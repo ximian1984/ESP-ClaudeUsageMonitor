@@ -317,9 +317,18 @@ static void drawLimit(const Model &m, const UsageLimit *l, const char *fallbackL
     text("%", R, y + 20, c, 4, TR_DATUM);  // a 26 px-es "%" alja a 48 px-es szamok aljahoz
     text(String((int)(left + 0.5f)), R - pw - 2, y, c, 6, TR_DATUM);
     drawRectS(6, y + 52, W - 12, 12, TFT_DARKGREY);
-    int fill = (int)((W - 14) * left / 100.0f);
-    // A csik a cimke folyamatos skalajat kapja (projektgazda, 2026-09-21); regi/lejart adatnal szurke, mint a cimke.
-    if (fill > 0) fillRectS(7, y + 53, fill, 10, labelColor);
+    // Csik (projektgazda, 2026-09-21), regi/lejart adatnal szurke, mint a cimke:
+    //  - SESSION: a FOGYAST mutatja, balrol tolt, szinatmenettel (bal szel zold, jobb szel = 100 % elfogyott piros);
+    //  - WEEKLY (es a tobbi): a MARADEKOT mutatja, egyetlen tonussal, ami a fogyassal zoldbol pirosba valt (= cimke).
+    bool grey = labelColor == TFT_LIGHTGREY;
+    if (l->kind == LimitKind::Session) {
+      int fill = (int)((W - 14) * (100.0f - left) / 100.0f);
+      for (int i = 0; i < fill; i++)
+        fillRectS(7 + i, y + 53, 1, 10, grey ? TFT_LIGHTGREY : usageColor565(100.0f - 100.0f * i / (W - 15)));
+    } else {
+      int fill = (int)((W - 14) * left / 100.0f);
+      if (fill > 0) fillRectS(7, y + 53, fill, 10, labelColor);
+    }
   } else {
     text("?", R, y + 12, TFT_DARKGREY, 4, TR_DATUM);
   }

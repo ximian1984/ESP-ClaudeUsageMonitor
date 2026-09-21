@@ -32,9 +32,13 @@ hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletez
   A host-renderer mindkét tájolást kirajzolja (`allo_*.png`).
 
 ### Módosítva
-- **A keret-csík a címke folyamatos színskáláját kapja** (zöld → sárga → piros), a dongle-on és a CYD-n is
-  (projektgazda). Eddig 30 % maradékig tiszta zöld volt, ezért nem sárgult. Régi/lejárt adatnál szürke, mint a címke.
-  `[vason mérve]` a CYD-n; a dongle-ra is flashelve.
+- **Keret-csíkok új színezése** (projektgazda), a dongle-on és a CYD-n is. Régi/lejárt adatnál szürke, mint a címke:
+  - **SESSION:** a **fogyást** mutatja, balról tölt, színátmenettel: a bal széle zöld, a jobb széle (100 % elfogyott) piros;
+  - **WEEKLY** (és a többi keret): a **maradékot** mutatja, egyetlen tónussal, ami a fogyással folyamatosan vált:
+    tele zöld, 50 %-nál sárga, elfogyva piros (ugyanaz, mint a címke).
+  - Eddig mindkettő a maradékot mutatta, és 30 % maradékig tiszta zöld volt, ezért nem sárgult.
+  - Közbülső próbálkozások (elvetve): mindkét csík egy tónussal; majd mindkettő helyzet szerinti átmenettel. A
+    projektgazda a két keretet eltérően olvassa: a session a fogyás, a heti egy fogyó érték.
 - Konfig: `displayFlip` (bool) → `displayRot` (negyedfordulat, NVS `drot`). A régi `flip` kulcs és a régi mentés
   `displayFlip` mezője 180°-ként töltődik be; a `flip` a 180°-hoz továbbra is íródik (visszaálláshoz). Az API
   (`/api/config`, `/api/display`, export/import) a `displayRot`-ot is adja/fogadja, a régi `flip`/`displayFlip`-et is.
