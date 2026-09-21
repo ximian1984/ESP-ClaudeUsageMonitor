@@ -324,7 +324,7 @@ csatlakoztatása után történik, az `⚠ [vason mérendő]`.
 |---|---|---|
 | PlatformIO Core | 6.2.0 (`brew install platformio`) | mérve |
 | Feltöltő | `esptool.py` 4.9.0, a PlatformIO hozza (`tool-esptoolpy`) — külön telepíteni nem kell | mérve |
-| Driver | nem kell: az ESP32-S3 natív USB-je CDC-ként látszik | ⚠ [vason mérendő] |
+| Driver | nem kell: az ESP32-S3 natív USB-je CDC-ként látszik (`USB JTAG_serial debug unit`, `303A:1001`) | mérve (2026-09-21, macOS) |
 | Kábel/csatlakozó | a T-Dongle-S3 **USB-A dugó**. USB-C-s Machez USB-C → USB-A (anya) adapter kell | termék-kialakítás |
 | Baud | 921600 (`boards/dongles3.json` `upload.speed`) | mérve (`pio run -t envdump`) |
 | Flash-címek | bootloader `0x0`, partíciók `0x8000`, `boot_app0` `0xe000`, firmware `0x10000` | mérve (`envdump`) |
@@ -342,7 +342,7 @@ csatlakoztatása után történik, az `⚠ [vason mérendő]`.
    ```
    ⚠ Ezen a Macen már van egy idegen soros eszköz: `/dev/cu.usbserial-140` (`1A86:7523`, CH340) — az **nem** a dongle.
 3. Dugd be a dongle-t (gomb nélkül), és futtasd újra a `pio device list`-et. Az új sor a dongle.
-   Várhatóan `/dev/cu.usbmodem…`, `303A:1001` (Espressif natív USB) `⚠ [vason mérendő]`.
+   Várhatóan `/dev/cu.usbmodem…`, `303A:1001` (Espressif natív USB) — mérve 2026-09-21.
 4. Feltöltés **kiírt porttal**:
    ```sh
    pio run -t upload --upload-port /dev/cu.usbmodemXXXX
@@ -356,8 +356,15 @@ csatlakoztatása után történik, az `⚠ [vason mérendő]`.
    2. **nyomd és tartsd** a BOOT gombot, és közben dugd be;
    3. engedd el, `pio device list` → a port neve változhat;
    4. ismételd a 4. lépést az új porttal.
+
+   Mérve (2026-09-21): a napok óta futó dongle sem az alap resetre, sem a `--before usb_reset`-re nem válaszolt
+   (`No serial data received`, háromszor); a BOOT-os újradugás után a sima 4. lépés átment. ⚠ Zsákutca: az
+   `esptool --before no_reset chip_id` próbakapcsolódás letöltési módban is elbukott — ne próbára várj, indítsd a
+   feltöltést. A portot folyamatosan nyitogató háttér-figyelő miatt a feltöltés `port is busy`-vel bukik.
 6. A letöltési módból indított feltöltés után **húzd ki, és dugd vissza gomb nélkül**. Különben a lapka letöltési
-   módban marad, és a firmware nem indul.
+   módban marad, és a firmware nem indul. Mérve (2026-09-21): az újradugás után a dongle egyszer `ASSOC_FAIL`-t kapott
+   a routertől, és a setup-AP-ra esett vissza, a profilok megvoltak (a feltöltés nem törli az NVS-t); egy sima
+   újraindítás megoldotta (`tools/serlog.py <port> 45 --reset`).
 7. Soros napló:
    ```sh
    pio device monitor -p /dev/cu.usbmodemXXXX -b 115200

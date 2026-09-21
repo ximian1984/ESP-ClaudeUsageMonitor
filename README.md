@@ -327,7 +327,7 @@ after the dongle is plugged in is `⚠ [to be measured on hardware]`.
 |---|---|---|
 | PlatformIO Core | 6.2.0 (`brew install platformio`) | measured |
 | Uploader | `esptool.py` 4.9.0, shipped by PlatformIO (`tool-esptoolpy`) — no separate install needed | measured |
-| Driver | none needed: the ESP32-S3's native USB appears as CDC | ⚠ [to be measured on hardware] |
+| Driver | none needed: the ESP32-S3's native USB appears as CDC (`USB JTAG_serial debug unit`, `303A:1001`) | measured (2026-09-21, macOS) |
 | Cable/connector | the T-Dongle-S3 is a **USB-A plug**. A USB-C Mac needs a USB-C → USB-A (female) adapter | product design |
 | Baud | 921600 (`boards/dongles3.json` `upload.speed`) | measured (`pio run -t envdump`) |
 | Flash offsets | bootloader `0x0`, partitions `0x8000`, `boot_app0` `0xe000`, firmware `0x10000` | measured (`envdump`) |
@@ -344,7 +344,7 @@ after the dongle is plugged in is `⚠ [to be measured on hardware]`.
    pio device list
    ```
 3. Plug in the dongle (without pressing anything) and run `pio device list` again. The new line is the dongle.
-   Expect `/dev/cu.usbmodem…`, `303A:1001` (Espressif native USB) `⚠ [to be measured on hardware]`.
+   Expect `/dev/cu.usbmodem…`, `303A:1001` (Espressif native USB) — measured 2026-09-21.
 4. Upload **with an explicit port**:
    ```sh
    pio run -t upload --upload-port /dev/cu.usbmodemXXXX
@@ -358,8 +358,16 @@ after the dongle is plugged in is `⚠ [to be measured on hardware]`.
    2. **press and hold** BOOT while plugging it back in;
    3. release; `pio device list` → the port name may change;
    4. repeat step 4 with the new port.
+
+   Measured (2026-09-21): a dongle that had been running for days answered neither the default reset nor
+   `--before usb_reset` (`No serial data received`, three tries); after the BOOT replug the plain step-4 upload went
+   through. ⚠ Dead end: probing it first with `esptool --before no_reset chip_id` failed even in download mode — do
+   not wait for a probe, just run the upload. A background poller that keeps opening the port also makes the upload
+   fail with `port is busy`.
 6. After an upload started from download mode, **unplug and replug without pressing the button**. Otherwise the chip
-   stays in download mode and the firmware never starts.
+   stays in download mode and the firmware never starts. Measured (2026-09-21): after that replug the dongle once got
+   `ASSOC_FAIL` from the router and fell back to its setup AP, with all profiles still in NVS (an upload does not erase
+   NVS); a plain reset fixed it (`tools/serlog.py <port> 45 --reset`).
 7. Serial log:
    ```sh
    pio device monitor -p /dev/cu.usbmodemXXXX -b 115200
