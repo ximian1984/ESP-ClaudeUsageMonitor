@@ -18,8 +18,9 @@ Changes: [`CHANGELOG.md`](CHANGELOG.md)
 > Not yet measured: automatic Claude token refresh (~8 hours), the no-Wi-Fi screen, the 180° rotation image.
 > Anything marked `⚠ [to be measured on hardware]` follows from source reading, not from measurement.
 >
-> **ESP32-2432S028R (CYD), 2026-09-19:** two new envs (`esp32-2432s028r` ILI9341, `esp32-2432s028r-st7789`) with a
-> native 320×240 layout. **Builds cleanly and is verified by machine render, but has never run on a physical board** (§2/b).
+> **ESP32-2432S028R (CYD), 2026-09-21: first run on a physical board** (a USB-C + micro-USB board, ESP32-D0WD-V3):
+> picture, colours (with the new `esp32-2432s028r-inv` env), rotation incl. 90° portrait, backlight, Wi-Fi, and the
+> first real HTTPS call (`HTTP 200`, usage parsed) are **measured** (§2/b).
 
 ---
 
@@ -37,7 +38,7 @@ itself how much of your quota is left and when it renews.
   `ERR 403`, …).
 - Without Wi-Fi or data it shows the **last known reset times** (these survive a reboot).
 - Clear error screens: `RE-LOGIN NEEDED`, `NO WIFI - SETUP` (with the setup Wi-Fi name and password), `NTP ERR`, …
-- The display can be **rotated 180°** if the dongle sits upside down.
+- The display can be **rotated 180°** if the dongle sits upside down; on the CYD also **90°/270° (portrait)**.
 
 ### Which accounts it handles
 | Source | Sign-in | What it shows | Status |
@@ -85,13 +86,13 @@ PlatformIO env; you never have to touch source code.
 | Board | SoC / flash | Display | PlatformIO env | Verified on hardware? |
 |---|---|---|---|---|
 | **LILYGO T-Dongle-S3** (the plain one, not the -Plus) | ESP32-S3, 16 MB, no PSRAM | 0.96" **ST7735**, 160×80 | `t-dongle-s3` *(default)* | ✅ **YES** — 2026-09-17/18, measured end to end on a real board |
-| **ESP32-2432S028R "CYD"** — single micro-USB (original), or USB-C only ("Rv2") | ESP32-WROOM-32, 4 MB, no PSRAM | 2.8" **ILI9341**, 320×240 | `esp32-2432s028r` | ⚠ **NO** — we have no physical board |
-| **ESP32-2432S028R "CYD"** — USB-C + micro-USB ("CYD2USB" / "Rv3") | ESP32-WROOM-32, 4 MB, no PSRAM | 2.8" **ST7789**, 320×240 | `esp32-2432s028r-st7789` | ⚠ **NO** — we have no physical board |
+| **ESP32-2432S028R "CYD"** — single micro-USB (original), or USB-C only ("Rv2") | ESP32-WROOM-32, 4 MB, no PSRAM | 2.8" **ILI9341**, 320×240 | `esp32-2432s028r` | ⚠ **NO** — not this revision |
+| **ESP32-2432S028R "CYD"** — USB-C + micro-USB, ILI9341 with inverted colours (ours) | ESP32-D0WD-V3, 4 MB, no PSRAM | 2.8" **ILI9341**, 320×240 | `esp32-2432s028r-inv` | ✅ **YES** — 2026-09-21, display + Wi-Fi + HTTPS `200` |
+| **ESP32-2432S028R "CYD"** — USB-C + micro-USB ("CYD2USB" / "Rv3"), ST7789 variant | ESP32-WROOM-32, 4 MB, no PSRAM | 2.8" **ST7789**, 320×240 | `esp32-2432s028r-st7789` | ⚠ **NO** — not tried |
 
-> ⛔ **Said plainly:** the **CYD support has never run on a physical board.** What exists: a clean build (0 warnings),
-> a native 320×240 layout, and machine renders produced by the real drawing code. What is **open and can only be settled
-> on hardware:** the display driver and colour order, inversion, rotation direction, backlight, readability, and whether
-> the classic ESP32's free heap is enough for the TLS handshake. On the dongle all of this **is measured.** See §2/b and §15.
+> **Said plainly:** the CYD has run on **one** physical board (2026-09-21, a two-connector board that turned out to be
+> ILI9341 with inverted colours, not ST7789). Measured there: picture, colours, rotation (0° and 90°), backlight, Wi-Fi,
+> and HTTPS `200` with heap to spare. The other two revisions (original micro-USB, ST7789) have **not** run. See §2/b.
 
 **Nothing but the display differs:** Wi-Fi handling, TLS, OAuth, fetching, caching, the setup UI and the web mirror are
 **bit-for-bit the same code** on both boards.
@@ -195,7 +196,7 @@ The board definition is copied from the official LilyGO repository: [`boards/don
 - `TFT_eSPI 2.5.43`, with the values from LilyGO's `Setup209_LilyGo_T_Dongle_S3.h`, passed as build flags;
 - `ArduinoJson 7`.
 
-## 2/b. ESP32-2432S028R ("Cheap Yellow Display", CYD) — second board, ⚠ NOT measured on hardware
+## 2/b. ESP32-2432S028R ("Cheap Yellow Display", CYD) — second board, measured on one revision
 
 The firmware builds for the CYD **as well**, with separate PlatformIO envs. The dongle env (`t-dongle-s3`) is unchanged
 and remains the default (`pio run`). On the CYD the entire Wi-Fi/HTTPS/OAuth/usage logic is **the same code**. Only the
@@ -208,10 +209,21 @@ display differs: it has its own **native 320×240 (landscape) layout**
 - **footer:** the setup page address (`http://<IP>`), plus the index when there are several profiles (`1/3`).
 
 The error screens (setup AP, `RE-LOGIN NEEDED`, last known resets, loading) are the same as on the dongle, just larger.
+Two extras on the CYD's **setup-AP screen** (`NO WIFI - SETUP` / `SETUP MODE`):
 
-| Two quotas | Error over stale data | Setup AP |
-|---|---|---|
-| ![two quotas](docs/cyd/1_ket_keret.png) | ![error](docs/cyd/2_hiba_regi_adat.png) | ![setup AP](docs/cyd/8_setup_ap.png) |
+- a **Wi-Fi QR code** (`WIFI:T:WPA;S:…;P:…;;`): a phone camera joins the setup network without typing. The text stays
+  next to it. Encoder: Nayuki `qrcodegen` (MIT, [`src/vendor/`](src/vendor/_SOURCE.md)). It is drawn only if it fits the
+  132 px box at 3 px per module or more; otherwise the screen is text only;
+- a **retry countdown** instead of "every 5 min": `retrying Wi-Fi in 4:32`, `searching Wi-Fi...` while it scans/connects,
+  and `retry waits: phone on AP` when the retry is due but a phone is connected to the AP (the retry never drops the
+  phone doing the setup).
+
+**Portrait (90° / 270°):** the setup page offers 0/90/180/270° on the CYD. Every screen has a 240×320 layout; the band
+sprite is recreated at 240×40 (19.2 KB) and a frame is 8 bands.
+
+| Two quotas | Error over stale data | Setup AP (QR) | Portrait | Portrait setup AP |
+|---|---|---|---|---|
+| ![two quotas](docs/cyd/1_ket_keret.png) | ![error](docs/cyd/2_hiba_regi_adat.png) | ![setup AP](docs/cyd/8_setup_ap.png) | ![portrait](docs/cyd/allo_1_ket_keret.png) | ![portrait setup AP](docs/cyd/allo_8_setup_ap.png) |
 
 > These images are **machine renders, not photographs**: the real `display_cyd.cpp` runs on a Mac with TFT_eSPI's own
 > font tables (`sh test/host/render_cyd.sh <dir>`). They show the geometry of the layout (what fits, what goes where).
@@ -221,10 +233,22 @@ The error screens (setup AP, `RE-LOGIN NEEDED`, last known resets, loading) are 
 buffer, so on request the same drawing code redraws it band by band and sends it band by band (6 × 25.6 KB = 153.6 KB
 per frame, once a second while the mirror is open). The dongle stays at 160×80.
 
-> ⚠ **Nothing has been measured on a physical CYD board** (2026-09-19). The build is clean and the settings come from
-> three community sources (file:line recorded in the internal design notes). **Open, and decided only on hardware:** the display
-> driver, colour order, inversion, rotation direction, backlight level, and whether the free heap on the classic ESP32
-> is enough for the TLS handshake.
+**Measured on hardware (2026-09-21)**, on a USB-C + micro-USB board (ESP32-D0WD-V3 rev 3.1, 4 MB, CH340):
+
+| What | Result |
+|---|---|
+| Driver | `ILI9341_2_DRIVER` — correct `[measured on hardware]` |
+| Inversion | with the plain `esp32-2432s028r` env: **white background, blue (really cyan) text** = inverted. With `-DTFT_INVERSION_ON=1` (the `esp32-2432s028r-inv` env): black background, red title — correct `[measured on hardware]` |
+| Colour order | correct (red is red); no RGB/BGR swap needed `[measured on hardware]` |
+| Rotation | landscape (0°) reads upright; **90° portrait reads correctly** `[measured on hardware]`; 180° and 270° not looked at |
+| Backlight | GPIO21 active HIGH, full brightness `[measured on hardware]` |
+| TLS heap | at boot 237,424 B free, largest block 110,580 B. **First HTTPS call: `oauth: HTTP 200`, usage parsed (3 limits)**; afterwards 153,780 B free, minimum 94,540 B `[measured on hardware]` |
+| Wi-Fi QR | decodes byte-exact from the machine render (`zbarimg`, both orientations); ⚠ a phone scan on the real panel is not yet measured |
+
+> ⚠ **Dead end worth knowing:** "two connectors = ST7789" (the table below, from community sources) was **wrong for this
+> board**. It was ILI9341 with inverted colours. The inverted picture gives it away: white instead of black, and red
+> turns cyan (0xF800 → 0x07FF), which looks blue. With a red/blue swap the background would have stayed black and the
+> text would be blue. If your two-connector board shows a white background, try `-inv` first.
 
 | | |
 |---|---|
@@ -241,10 +265,11 @@ per frame, once a second while the mirror is open). The dongle stays at 160×80.
 |---|---|---|
 | **One micro-USB** connector (the original CYD) | `esp32-2432s028r` (ILI9341) — **start here** | see the next row |
 | **USB-C only** (the "Rv2") | `esp32-2432s028r` (ILI9341) | Inverted colours (white background instead of black) → add to the env's `build_flags`: `-DTFT_INVERSION_ON=1` |
-| **USB-C + micro-USB** ("CYD2USB", "Rv3"), or "7789" printed on the box | `esp32-2432s028r-st7789` | Red and blue swapped → `-DTFT_RGB_ORDER=TFT_RGB`. Inverted colours → `-DTFT_INVERSION_ON=1` instead of `-DTFT_INVERSION_OFF=1`. |
+| **USB-C + micro-USB** ("CYD2USB", "Rv3") | **`esp32-2432s028r-inv`** (ILI9341 + inversion) — **measured on our board** | white background → it is not this one, try `esp32-2432s028r-st7789` |
+| "7789" printed on the box | `esp32-2432s028r-st7789` | Red and blue swapped → `-DTFT_RGB_ORDER=TFT_RGB`. Inverted colours → `-DTFT_INVERSION_ON=1` instead of `-DTFT_INVERSION_OFF=1`. |
 
 For the ST7789 board **the sources disagree** about colour order: witnessmenow says BGR, rzeldent says RGB. The env
-follows witnessmenow's setting. If the image is upside down, the rotation checkbox on the setup page fixes it, exactly
+follows witnessmenow's setting. If the image is upside down, the rotation setting on the setup page fixes it, exactly
 as on the dongle.
 
 ```sh
@@ -424,9 +449,11 @@ With OAuth the token comes from the sign-in; with web you supply an Organization
 
 ## 10. Display
 
-On the **Display & refresh** part of the setup page: profile rotation 1–60 s (default 5 s), **180° rotation** (if the
-dongle sits upside down; NVS `flip`, effective immediately, `tft.setRotation(3)` — ⚠ [to be measured on hardware]
-whether the ST7735 offsets still line up when rotated), and the **usage refresh interval per profile, 60–3600 s
+On the **Display & refresh** part of the setup page: profile rotation 1–60 s (default 5 s), **display rotation**
+(0°/180° on the dongle, if it sits upside down — `tft.setRotation(3)`, ⚠ [to be measured on hardware] whether the ST7735
+offsets still line up when rotated; 0°/90°/180°/270° on the CYD, where 90°/270° switch to the portrait layout. NVS `drot`
+in quarter turns, effective immediately; an older `flip` setting and an older backup's `displayFlip` load as 180°. A
+backup with 90° imported on a dongle falls back to 0°), and the **usage refresh interval per profile, 60–3600 s
 (default 180 s)** — usage changes slowly, and the conservative default is gentle on the quota and reduces the
 footprint. Rotation only **changes which profile is displayed**; it does not trigger a fetch, so even at 1 s rotation
 the configured refresh interval stands. The "Claude requests since boot" counter shows this.
@@ -673,8 +700,11 @@ it is in the file headers; it reads the password from a file (`CMON_PW_FILE`), w
 - The certificate chain root may change (Cloudflare may switch issuer) → add the new root to `src/ca_certs.h`.
 - `time_t` is 32-bit (Arduino-ESP32 2.0.17) → good until 2038.
 - No OTA updates: firmware over USB only.
-- **CYD (ESP32-2432S028R):** only a build and machine renders exist; nothing has run on a physical board (§2/b). Open:
-  the display driver and colours, readability, frame time, and the heap headroom during TLS. The touchscreen is unused.
+- **CYD (ESP32-2432S028R):** measured on one board revision (§2/b): display, colours, 0°/90° rotation, Wi-Fi, HTTPS.
+  Open: the other two revisions, 180°/270° on the CYD, which way 90° turns relative to the connector, a phone scan of the
+  Wi-Fi QR, frame time. The touchscreen is unused.
+- **Two devices with the same Claude login** (e.g. settings copied from one to another): Claude rotates the refresh
+  token on every refresh, so the device that refreshes second may end up with `RE-LOGIN NEEDED`. ⚠ not yet observed.
 
 ---
 

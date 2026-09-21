@@ -9,6 +9,8 @@ mkdir -p "$OUTDIR"
 OUT="${TMPDIR:-/tmp}/cmon_render_cyd"
 TFT=../../.pio/libdeps/esp32-2432s028r/TFT_eSPI
 [ -d "$TFT/Fonts" ] || { echo "hianyzik $TFT — futtasd elobb: pio run -e esp32-2432s028r"; exit 1; }
+# A QR-kodolo C (nem C++) forras: kulon, cc-vel.
+cc -c -O1 ../../src/vendor/qrcodegen.c -o "$OUT.qrcodegen.o"
 g++ -std=c++17 -Wall -Wextra -Wno-unused-parameter -DBOARD_CYD=1 -Irender_stub -Istub -I../../src -I"$TFT" \
-  render_cyd.cpp ../../src/display_cyd.cpp ../../src/time_manager.cpp ../../src/usage_types.cpp -lz -o "$OUT"
+  render_cyd.cpp ../../src/display_cyd.cpp ../../src/time_manager.cpp ../../src/usage_types.cpp "$OUT.qrcodegen.o" -lz -o "$OUT"
 "$OUT" "$OUTDIR"

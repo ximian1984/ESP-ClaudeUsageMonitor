@@ -70,7 +70,8 @@ void ConfigManager::load() {
   }
   _cfg.rotationSec = constrain(p.getUChar("rot", ROTATION_DEFAULT_S), ROTATION_MIN_S, ROTATION_MAX_S);
   _cfg.refreshSec = constrain((int)p.getUShort("refr", CLAUDE_REFRESH_DEFAULT_S), REFRESH_PERIOD_MIN_S, REFRESH_PERIOD_MAX_S);
-  _cfg.displayFlip = p.getBool("flip", false);
+  _cfg.displayRot = p.isKey("drot") ? p.getUChar("drot", 0) : (p.getBool("flip", false) ? 2 : 0);
+  if (!displayRotAllowed(_cfg.displayRot)) _cfg.displayRot = 0;
   if (p.isKey("tz") && p.getString("tz", _cfg.tz, sizeof(_cfg.tz)) == 0) strlcpy(_cfg.tz, TZ_EUROPE_BUDAPEST, sizeof(_cfg.tz));
 
   if (p.getString("appass", _cfg.apPassword, sizeof(_cfg.apPassword)) == 0 || strlen(_cfg.apPassword) < 8) {
@@ -115,13 +116,14 @@ bool ConfigManager::importAll(const DeviceConfig &in) {
   }
   _cfg.rotationSec = in.rotationSec;
   _cfg.refreshSec = in.refreshSec;
-  _cfg.displayFlip = in.displayFlip;
+  _cfg.displayRot = in.displayRot;
   strlcpy(_cfg.tz, in.tz, sizeof(_cfg.tz));
   Preferences p;
   p.begin(NS, false);
   p.putUChar("rot", _cfg.rotationSec);
   p.putUShort("refr", _cfg.refreshSec);
-  p.putBool("flip", _cfg.displayFlip);
+  p.putUChar("drot", _cfg.displayRot);
+  p.putBool("flip", _cfg.displayRot == 2);  // regebbi firmware-re visszaallva is 180 fok maradjon
   p.putString("tz", _cfg.tz);
   p.end();
   _version++;
@@ -216,12 +218,18 @@ bool ConfigManager::saveTimezone(const char *posixTz) {
   return true;
 }
 
-bool ConfigManager::saveDisplayFlip(bool flip) {
+bool ConfigManager::displayRotAllowed(int rot) {
+  return rot == 0 || rot == 2 || (DISPLAY_QUARTER_TURNS && (rot == 1 || rot == 3));
+}
+
+bool ConfigManager::saveDisplayRot(uint8_t rot) {
+  if (!displayRotAllowed(rot)) return false;
   Lock l(_mtx);
-  _cfg.displayFlip = flip;
+  _cfg.displayRot = rot;
   Preferences p;
   p.begin(NS, false);
-  p.putBool("flip", flip);
+  p.putUChar("drot", rot);
+  p.putBool("flip", rot == 2);
   p.end();
   _version++;
   return true;
@@ -256,7 +264,7 @@ ClaudeBrief ConfigManager::brief() {
   ClaudeBrief b;
   b.rotationSec = _cfg.rotationSec;
   b.refreshSec = _cfg.refreshSec;
-  b.displayFlip = _cfg.displayFlip;
+  b.displayRot = _cfg.displayRot;
   for (int i = 0; i < MAX_CLAUDE_PROFILES; i++) {
     const ClaudeProfile &c = _cfg.claude[i];
     if (!c.used || !c.enabled) continue;

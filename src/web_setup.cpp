@@ -193,7 +193,9 @@ static void handleConfig() {
   }
   doc["rotationSec"] = cfg.rotationSec;
   doc["refreshSec"] = cfg.refreshSec;
-  doc["displayFlip"] = cfg.displayFlip;
+  doc["displayRot"] = cfg.displayRot;
+  doc["displayFlip"] = cfg.displayRot == 2;  // a regi kliensnek
+  doc["quarterTurns"] = (bool)DISPLAY_QUARTER_TURNS;
   doc["tz"] = cfg.tz;
   doc["maxWifi"] = MAX_WIFI_PROFILES;
   doc["maxClaude"] = MAX_CLAUDE_PROFILES;
@@ -500,7 +502,9 @@ static void handleDisplay() {
   int sec = argInt("rotationSec", -1);
   if (sec < ROTATION_MIN_S || sec > ROTATION_MAX_S) return sendError(400, "rotation 1-60 sec");
   if (!configManager.saveRotation((uint8_t)sec)) return sendError(500, "save failed");
-  configManager.saveDisplayFlip(argBool("flip"));  // 180 fokos forgatas; azonnal ervenyes
+  // Forgatas negyedfordulatban (0-3); a regi kliens "flip" pipat kuld. Azonnal ervenyes.
+  int drot = server.hasArg("displayRot") ? argInt("displayRot", -1) : (argBool("flip") ? 2 : 0);
+  if (!configManager.saveDisplayRot((uint8_t)constrain(drot, 0, 255))) return sendError(400, "unsupported display rotation");
   sendOk();
 }
 
@@ -629,7 +633,8 @@ static void buildExport(bool secrets, JsonDocument &doc) {
   }
   doc["rotationSec"] = cfg->rotationSec;
   doc["refreshSec"] = cfg->refreshSec;
-  doc["displayFlip"] = cfg->displayFlip;
+  doc["displayRot"] = cfg->displayRot;
+  doc["displayFlip"] = cfg->displayRot == 2;  // regebbi firmware importjahoz
   doc["tz"] = cfg->tz;
   Serial.printf("[web] export: %u Wi-Fi, %u Claude, titok=%s\n", (unsigned)wa.size(), (unsigned)ca.size(), secrets ? "igen" : "nem");
 }
@@ -791,7 +796,10 @@ static void handleImport() {
   if (refr < REFRESH_PERIOD_MIN_S || refr > REFRESH_PERIOD_MAX_S) return sendError(400, "refresh 60-3600 sec");
   nc->rotationSec = (uint8_t)rot;
   nc->refreshSec = (uint16_t)refr;
-  nc->displayFlip = in["displayFlip"] | cur->displayFlip;
+  // Uj mentes: displayRot; regi mentes: csak displayFlip. Masik lapka menteset (pl. CYD 90 fok -> dongle) 0-ra vesszuk.
+  int drot = in["displayRot"].is<int>() ? in["displayRot"].as<int>()
+             : in["displayFlip"].is<bool>() ? (in["displayFlip"].as<bool>() ? 2 : 0) : cur->displayRot;
+  nc->displayRot = ConfigManager::displayRotAllowed(drot) ? (uint8_t)drot : 0;
   const char *tz = in["tz"] | cur->tz;
   if (!TimeManager::validPosixTz(tz)) return sendError(400, "invalid POSIX TZ");
   strlcpy(nc->tz, tz, sizeof(nc->tz));

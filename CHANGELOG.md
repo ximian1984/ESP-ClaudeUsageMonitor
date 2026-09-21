@@ -8,6 +8,37 @@ hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletez
 
 ---
 
+## [Nem kiadott] – 2026-09-21
+
+### Mérve
+- **A CYD először futott valódi lapon** (USB-C + micro-USB-s lap, ESP32-D0WD-V3 rev 3.1, 4 MB, CH340). `[vason mérve]`:
+  - driver: `ILI9341_2_DRIVER` jó; háttérfény: GPIO21, aktív HIGH, teljes fényerő;
+  - invertálás: a sima `esp32-2432s028r` env-vel fehér háttér + kék (cián) felirat → `-DTFT_INVERSION_ON=1` kell;
+    a színsorrend jó (nincs RGB/BGR-csere);
+  - forgatás: a fekvő (0°) és a **90°-os álló** kép is jól olvasható; a 180/270° a CYD-n nincs megnézve;
+  - **TLS-heap:** induláskor 237 424 B szabad, legnagyobb blokk 110 580 B; az **első HTTPS-hívás `HTTP 200`**, a usage
+    feldolgozva (3 limit); utána 153 780 B szabad, mélypont 94 540 B. A klasszikus ESP32-nek elég.
+- Zsákutca: a „két csatlakozó = ST7789" szabály (közösségi forrásokból) erre a lapra nem állt; ILI9341 volt.
+
+### Hozzáadva
+- `esp32-2432s028r-inv` env: ILI9341 + invertálás, a fenti lapra.
+- **CYD setup-AP: Wi-Fi QR-kód** (`WIFI:T:WPA;…`) a szöveg mellett, hogy a telefon gépelés nélkül csatlakozzon
+  (projektgazda). Nayuki `qrcodegen` (MIT, `src/vendor/`). Csak akkor rajzolja ki, ha legalább 3 px/modullal befér.
+  A gépi renderről `zbarimg` bájtra pontosan visszaolvassa; telefonnal a valódi panelről ⚠ még nem mért.
+- **CYD setup-AP: visszaszámláló** az újrapróbálásig (`retrying Wi-Fi in 4:32` / `searching Wi-Fi...` /
+  `retry waits: phone on AP`) (projektgazda). `WifiManager::apRetryInMs()`, `apHasClients()`.
+- **90°/270°-os forgatás (álló kép) a CYD-n** (projektgazda): a setup-oldalon választó 0/90/180/270°-kal (a dongle-on
+  csak 0/180°). Minden CYD-képernyőnek van 240×320-as elrendezése; a sáv-sprite forgatáskor 240×40-esre jön létre újra.
+  A host-renderer mindkét tájolást kirajzolja (`allo_*.png`).
+
+### Módosítva
+- **A keret-csík a címke folyamatos színskáláját kapja** (zöld → sárga → piros), a dongle-on és a CYD-n is
+  (projektgazda). Eddig 30 % maradékig tiszta zöld volt, ezért nem sárgult. Régi/lejárt adatnál szürke, mint a címke.
+  `[vason mérve]` a CYD-n; a dongle-ra is flashelve.
+- Konfig: `displayFlip` (bool) → `displayRot` (negyedfordulat, NVS `drot`). A régi `flip` kulcs és a régi mentés
+  `displayFlip` mezője 180°-ként töltődik be; a `flip` a 180°-hoz továbbra is íródik (visszaálláshoz). Az API
+  (`/api/config`, `/api/display`, export/import) a `displayRot`-ot is adja/fogadja, a régi `flip`/`displayFlip`-et is.
+
 ## [Nem kiadott] – 2026-09-19 (este)
 
 ### Módosítva

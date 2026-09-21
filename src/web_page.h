@@ -87,7 +87,7 @@ button.primary,a.primary{display:block;width:100%;padding:12px;margin-top:8px;ba
 <form onsubmit="return saveDisplay(event)">
   <label>Profile rotation interval (1-60 sec)</label><input type="number" id="rot" name="rotationSec" min="1" max="60" required>
   <label>Usage refresh interval per profile (60-3600 sec)</label><input type="number" id="refr" min="60" max="3600" required>
-  <label><input type="checkbox" id="flip"> rotate the display by 180&deg; (for upside-down mounting)</label>
+  <label>Display rotation</label><select id="drot"><option value="0">0&deg; (default)</option><option value="1" class="qt">90&deg; (portrait)</option><option value="2">180&deg; (upside down)</option><option value="3" class="qt">270&deg; (portrait)</option></select>
   <button type="submit">Save</button>
 </form>
 
@@ -188,7 +188,7 @@ function loadStatus(){apiGet('/api/status').then(s=>{
   if(cfg)renderClaude(s.claude);
 }).catch(()=>{})}
 
-function load(tries){tries=tries||0;apiGet('/api/config').then(c=>{unlock();cfg=c;$('rot').value=c.rotationSec;$('refr').value=c.refreshSec;$('flip').checked=!!c.displayFlip;showTz(c.tz||'');renderWifi();onTransport();loadStatus()}).catch(e=>{if(e.message==='login required'){say('Log in to view and change the settings');loadStatus();return}if(tries<15){say('Device busy (Wi-Fi reconnect?), retrying...');setTimeout(()=>load(tries+1),2000)}else say('Device not reachable - reload the page')})}
+function load(tries){tries=tries||0;apiGet('/api/config').then(c=>{unlock();cfg=c;$('rot').value=c.rotationSec;$('refr').value=c.refreshSec;document.querySelectorAll('#drot .qt').forEach(o=>o.hidden=o.disabled=!c.quarterTurns);$('drot').value=String(c.displayRot|0);showTz(c.tz||'');renderWifi();onTransport();loadStatus()}).catch(e=>{if(e.message==='login required'){say('Log in to view and change the settings');loadStatus();return}if(tries<15){say('Device busy (Wi-Fi reconnect?), retrying...');setTimeout(()=>load(tries+1),2000)}else say('Device not reachable - reload the page')})}
 
 function renderWifi(){
   const tb=$('wifiList');tb.textContent='';
@@ -300,7 +300,7 @@ function doImport(){const f=$('impFile').files[0];if(!f){say('Choose a file firs
       if(!j.ok)throw new Error(j.error||'import failed');
       $('impFile').value='';$('impPw').value='';$('impPwRow').style.display='none';say('Imported: '+j.wifi+' Wi-Fi, '+j.claude+' AI profiles'+(j.reconnect?' - Wi-Fi reconnecting...':''));load()}))})
   .catch(e=>say(e.message))}
-function saveDisplay(ev){ev.preventDefault();Promise.all([post('/api/display',{rotationSec:$('rot').value,flip:$('flip').checked?'1':'0'}),post('/api/refresh',{refreshSec:$('refr').value})]).then(()=>say('Saved')).catch(e=>say(e.message));return false}
+function saveDisplay(ev){ev.preventDefault();Promise.all([post('/api/display',{rotationSec:$('rot').value,displayRot:$('drot').value}),post('/api/refresh',{refreshSec:$('refr').value})]).then(()=>say('Saved')).catch(e=>say(e.message));return false}
 
 load();setInterval(loadStatus,5000);
 </script></body></html>)HTML";

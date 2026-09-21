@@ -25,13 +25,17 @@
 #define TFT_WHITE 0xFFFF
 #define TFT_ORANGE 0xFDA0
 
-static const int HOST_SCREEN_W = 320, HOST_SCREEN_H = 240;
+// A kepernyo merete a forgatastol fugg (setRotation: paratlan = fekvo 320x240, paros = allo 240x320).
+extern int g_screenW, g_screenH;
 extern std::vector<uint16_t> g_screen;  // a pushSprite ide masol (RGB565, nem bajtcserelt)
 
 class TFT_eSPI {
  public:
   void init() {}
-  void setRotation(int) {}
+  void setRotation(int r) {
+    g_screenW = r & 1 ? 320 : 240;
+    g_screenH = r & 1 ? 240 : 320;
+  }
   void fillScreen(uint16_t c) { std::fill(g_screen.begin(), g_screen.end(), c); }
 };
 
@@ -44,6 +48,7 @@ class TFT_eSprite {
     _buf.assign((size_t)w * h, 0);
     return _buf.data();
   }
+  void deleteSprite() { _buf.clear(); }
   void *getPointer() { return _buf.data(); }
   void fillSprite(uint16_t c) { std::fill(_buf.begin(), _buf.end(), c); }
   void fillRect(int x, int y, int w, int h, uint16_t c) {
@@ -74,8 +79,8 @@ class TFT_eSprite {
   void pushSprite(int x, int y) {
     for (int j = 0; j < _h; j++)
       for (int i = 0; i < _w; i++)
-        if (x + i >= 0 && y + j >= 0 && x + i < HOST_SCREEN_W && y + j < HOST_SCREEN_H)
-          g_screen[(size_t)(y + j) * HOST_SCREEN_W + x + i] = _buf[(size_t)j * _w + i];
+        if (x + i >= 0 && y + j >= 0 && x + i < g_screenW && y + j < g_screenH)
+          g_screen[(size_t)(y + j) * g_screenW + x + i] = _buf[(size_t)j * _w + i];
   }
 
  private:

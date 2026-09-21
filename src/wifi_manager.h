@@ -37,6 +37,10 @@ class WifiManager {
   String apSsid() const { return _apSsid; }
   String apPassword() const { return _apPassword; }
   String ipString() const;
+  // AP-fallbackban (kijelzonek): ms a kovetkezo idozitett ujraprobalasig; 0 = esedekes, de AP-kliens miatt var;
+  // -1 = eppen probal (scan vagy csatlakozasi kiserlet).
+  int32_t apRetryInMs() const;
+  bool apHasClients() const;
   int32_t rssi() const;
   const char *stateName() const;
 

@@ -16,8 +16,9 @@ Változások: [`CHANGELOG.md`](CHANGELOG.md)
 > **ChatGPT, Gemini, Grok: megírva, fordul, host-teszt zöld, vason MÉG NEM futott** (11.).
 > Még nem mért: a Claude-token automatikus frissítése (~8 óra), a Wi-Fi nélküli képernyő, a 180°-os forgatás képe.
 > Amit `⚠ [vason mérendő]` jelöl, az forrásból következik, nem mérésből.
-> **ESP32-2432S028R (CYD), 2026-09-19:** két új env (`esp32-2432s028r` ILI9341, `esp32-2432s028r-st7789`), natív
-> 320×240-es elrendezéssel. **Tisztán fordul, gépi renderrel ellenőrzött, de fizikai lapon NEM futott** (2/b.).
+> **ESP32-2432S028R (CYD), 2026-09-21: először futott valódi lapon** (USB-C + micro-USB-s lap, ESP32-D0WD-V3):
+> a kép, a színek (az új `esp32-2432s028r-inv` env-vel), a forgatás a 90°-os állóval együtt, a háttérfény, a Wi-Fi és az
+> első valódi HTTPS-hívás (`HTTP 200`, usage feldolgozva) **mérve** (2/b.).
 
 ---
 
@@ -34,7 +35,7 @@ a keretedből és mikor újul meg.
 - A jobb felső sarok 3 másodpercenként az **IP-címet** és az **állapotot** mutatja (adat kora, `NO WIFI`, `ERR 403`…).
 - Wi-Fi nélkül vagy adat híján az **utolsó ismert reset-időpontokat** mutatja (ezek újraindítást is túlélnek).
 - Hiba esetén beszédes képernyő: `RE-LOGIN NEEDED`, `NO WIFI - SETUP` (a beállító Wi-Fi nevével és jelszavával), `NTP ERR`, …
-- A kijelző **180°-kal elforgatható**, ha fejjel lefelé áll a dongle.
+- A kijelző **180°-kal elforgatható**, ha fejjel lefelé áll a dongle; a CYD-n **90°/270°-kal is (álló kép)**.
 
 ### Milyen fiókot kezel
 | Forrás | Bejelentkezés | Mit mutat | Állapot |
@@ -81,13 +82,13 @@ env-ben van, forráskódot nem kell hozzányúlni.
 | Lap | SoC / flash | Kijelző | PlatformIO env | Vason igazolt? |
 |---|---|---|---|---|
 | **LILYGO T-Dongle-S3** (a sima, nem -Plus) | ESP32-S3, 16 MB, PSRAM nincs | 0,96" **ST7735**, 160×80 | `t-dongle-s3` *(alapértelmezett)* | ✅ **IGEN** — 2026-09-17/18, valódi lapon végigmérve |
-| **ESP32-2432S028R „CYD"** — egy micro-USB (eredeti), vagy csak USB-C („Rv2") | ESP32-WROOM-32, 4 MB, PSRAM nincs | 2,8" **ILI9341**, 320×240 | `esp32-2432s028r` | ⚠ **NEM** — nincs fizikai lapunk |
-| **ESP32-2432S028R „CYD"** — USB-C + micro-USB („CYD2USB" / „Rv3") | ESP32-WROOM-32, 4 MB, PSRAM nincs | 2,8" **ST7789**, 320×240 | `esp32-2432s028r-st7789` | ⚠ **NEM** — nincs fizikai lapunk |
+| **ESP32-2432S028R „CYD"** — egy micro-USB (eredeti), vagy csak USB-C („Rv2") | ESP32-WROOM-32, 4 MB, PSRAM nincs | 2,8" **ILI9341**, 320×240 | `esp32-2432s028r` | ⚠ **NEM** — ez a revízió nincs meg |
+| **ESP32-2432S028R „CYD"** — USB-C + micro-USB, ILI9341 invertált színekkel (a miénk) | ESP32-D0WD-V3, 4 MB, PSRAM nincs | 2,8" **ILI9341**, 320×240 | `esp32-2432s028r-inv` | ✅ **IGEN** — 2026-09-21, kijelző + Wi-Fi + HTTPS `200` |
+| **ESP32-2432S028R „CYD"** — USB-C + micro-USB („CYD2USB" / „Rv3"), ST7789-es változat | ESP32-WROOM-32, 4 MB, PSRAM nincs | 2,8" **ST7789**, 320×240 | `esp32-2432s028r-st7789` | ⚠ **NEM** — nem próbáltuk |
 
-> ⛔ **Mondjuk ki őszintén:** a **CYD-támogatás fizikai lapon soha nem futott.** Ami megvan: tiszta build (0 warning),
-> natív 320×240-es elrendezés, és gépi render a valódi rajzoló kóddal. Ami **nyitott, és csak vason dől el:** a
-> kijelző-driver és a színsorrend, az invertálás, a forgatás iránya, a háttérfény, az olvashatóság, és hogy a
-> klasszikus ESP32 szabad heapje elég-e a TLS-kézfogáshoz. A dongle-on mindez **mérve van.** Részletek: 2/b. és 15.
+> **Mondjuk ki őszintén:** a CYD **egy** valódi lapon futott (2026-09-21; egy kétcsatlakozós lap, ami ILI9341-esnek
+> bizonyult invertált színekkel, nem ST7789-esnek). Ott mérve: kép, színek, forgatás (0° és 90°), háttérfény, Wi-Fi, és
+> HTTPS `200` bőséges heap-tartalékkal. A másik két revízió (eredeti micro-USB, ST7789) **nem** futott. Részletek: 2/b.
 
 **A kijelzőn kívül semmi nem különbözik:** a Wi-Fi-kezelés, a TLS, az OAuth, a lekérdezés, a gyorsítótár, a
 setup-felület és a webes tükör **bitre ugyanaz a kód** mindkét lapon.
@@ -191,7 +192,7 @@ A board-definíció a hivatalos LilyGO repóból van bemásolva: [`boards/dongle
 - `TFT_eSPI 2.5.43`, a LilyGO `Setup209_LilyGo_T_Dongle_S3.h` értékeivel, build-flagként;
 - `ArduinoJson 7`.
 
-## 2/b. ESP32-2432S028R („Cheap Yellow Display", CYD) — második lapka, ⚠ vason NEM mért
+## 2/b. ESP32-2432S028R („Cheap Yellow Display", CYD) — második lapka, egy revízión mérve
 
 A firmware a CYD-re **is** fordul, külön PlatformIO env-vel. A dongle env-je (`t-dongle-s3`) nem változott, és továbbra is
 ez az alapértelmezett (`pio run`). A CYD-n a teljes Wi-Fi/HTTPS/OAuth/usage logika **ugyanaz a kód**. Csak a kijelző
@@ -204,10 +205,21 @@ betűkkel:
 - **lábléc:** a setup-oldal címe (`http://<IP>`), több profilnál a sorszám (`1/3`).
 
 A hibaképernyők (setup-AP, `RE-LOGIN NEEDED`, utolsó ismert resetek, betöltés) ugyanazok, mint a dongle-on, csak nagyobbak.
+A CYD **setup-AP képernyőjén** (`NO WIFI - SETUP` / `SETUP MODE`) két többlet van:
 
-| Két keret | Hiba régi adat felett | Setup-AP |
-|---|---|---|
-| ![két keret](docs/cyd/1_ket_keret.png) | ![hiba](docs/cyd/2_hiba_regi_adat.png) | ![setup-AP](docs/cyd/8_setup_ap.png) |
+- **Wi-Fi QR-kód** (`WIFI:T:WPA;S:…;P:…;;`): a telefon kamerája gépelés nélkül felcsatlakozik a beállító hálóra. A
+  szöveg mellette marad. Kódoló: Nayuki `qrcodegen` (MIT, [`src/vendor/`](src/vendor/_SOURCE.md)). Csak akkor rajzolja
+  ki, ha a 132 px-es dobozba legalább 3 px/modullal befér; különben csak szöveg van;
+- **visszaszámláló** az „every 5 min" helyett: `retrying Wi-Fi in 4:32`, keresés/csatlakozás közben
+  `searching Wi-Fi...`, és `retry waits: phone on AP`, ha esedékes volna, de telefon van az AP-n (az újrapróbálás a
+  beállító telefont soha nem dobja le).
+
+**Álló kép (90° / 270°):** a setup-oldal a CYD-n 0/90/180/270°-ot kínál. Minden képernyőnek van 240×320-as elrendezése;
+a sáv-sprite 240×40-esre (19,2 KB) jön létre újra, egy kép 8 sáv.
+
+| Két keret | Hiba régi adat felett | Setup-AP (QR) | Álló | Álló setup-AP |
+|---|---|---|---|---|
+| ![két keret](docs/cyd/1_ket_keret.png) | ![hiba](docs/cyd/2_hiba_regi_adat.png) | ![setup-AP](docs/cyd/8_setup_ap.png) | ![álló](docs/cyd/allo_1_ket_keret.png) | ![álló setup-AP](docs/cyd/allo_8_setup_ap.png) |
 
 > A képek **gépi renderek, nem fotók**: a valódi `display_cyd.cpp` fut a Mac-en, a TFT_eSPI saját font-tábláival
 > (`sh test/host/render_cyd.sh <mappa>`). Az elrendezés geometriáját mutatják (mi fér ki, mi hová kerül). A panelt
@@ -217,10 +229,22 @@ A hibaképernyők (setup-AP, `RE-LOGIN NEEDED`, utolsó ismert resetek, betölt�
 nincs, ezért kérésre ugyanaz a rajzoló kód sávonként újra kirajzolja, és sávonként küldi el (6 × 25,6 KB = 153,6 KB
 képenként, másodpercenként egyszer, amíg a tükör nyitva van). A dongle-on marad a 160×80.
 
-> ⚠ **Fizikai CYD-lapon semmi nincs lemérve** (2026-09-19). A build tiszta, a beállítások három közösségi forrásból
-> jönnek (fájl:sor a belső tervdokumentációban). **Nyitott, és csak vason dől el:** a kijelző-driver, a színsorrend,
-> az invertálás, a forgatás iránya, a háttérfény szintje, és hogy a szabad heap elég-e a TLS-kézfogáshoz a klasszikus
-> ESP32-n.
+**Vason mérve (2026-09-21)**, USB-C + micro-USB-s lapon (ESP32-D0WD-V3 rev 3.1, 4 MB, CH340):
+
+| Mit | Eredmény |
+|---|---|
+| Driver | `ILI9341_2_DRIVER` — jó `[vason mérve]` |
+| Invertálás | a sima `esp32-2432s028r` env-vel **fehér háttér, kék (valójában cián) felirat** = invertált. `-DTFT_INVERSION_ON=1`-gyel (az `esp32-2432s028r-inv` env): fekete háttér, piros cím — jó `[vason mérve]` |
+| Színsorrend | jó (a piros piros); RGB/BGR-csere nem kell `[vason mérve]` |
+| Forgatás | fekvő (0°) egyenesen olvasható; **90°-on az álló kép jól olvasható** `[vason mérve]`; 180° és 270° nincs megnézve |
+| Háttérfény | GPIO21, aktív HIGH, teljes fényerő `[vason mérve]` |
+| TLS-heap | induláskor 237 424 B szabad, legnagyobb blokk 110 580 B. **Első HTTPS-hívás: `oauth: HTTP 200`, usage feldolgozva (3 limit)**; utána 153 780 B szabad, mélypont 94 540 B `[vason mérve]` |
+| Wi-Fi QR | a gépi renderről bájtra pontosan visszaolvasható (`zbarimg`, mindkét tájolás); ⚠ telefonos beolvasás a valódi panelről még nem mért |
+
+> ⚠ **Zsákutca, amit érdemes tudni:** a „két csatlakozó = ST7789" (a lenti táblázat, közösségi forrásokból) **erre a
+> lapra nem állt.** ILI9341 volt, invertált színekkel. Az invertált kép árulkodó: fekete helyett fehér, a piros pedig
+> ciánná válik (0xF800 → 0x07FF), ami kéknek látszik. Piros–kék cserénél a háttér fekete maradt volna, a felirat kék.
+> Ha a kétcsatlakozós lapod fehér hátteret mutat, előbb az `-inv`-et próbáld.
 
 | | |
 |---|---|
@@ -237,11 +261,12 @@ képenként, másodpercenként egyszer, amíg a tükör nyitva van). A dongle-on
 |---|---|---|
 | **Egy micro-USB** csatlakozó (az eredeti CYD) | `esp32-2432s028r` (ILI9341) — **ezzel kezdd** | lásd a következő sort |
 | **Csak USB-C** (a rzeldent-féle „Rv2") | `esp32-2432s028r` (ILI9341) | Invertált színek (fekete háttér helyett fehér) → a env `build_flags`-éhez: `-DTFT_INVERSION_ON=1` |
-| **USB-C + micro-USB** („CYD2USB", „Rv3"), vagy „7789" felirat a dobozon | `esp32-2432s028r-st7789` | Piros és kék felcserélve → `-DTFT_RGB_ORDER=TFT_RGB`. Invertált színek → `-DTFT_INVERSION_ON=1` a `-DTFT_INVERSION_OFF=1` helyett. |
+| **USB-C + micro-USB** („CYD2USB", „Rv3") | **`esp32-2432s028r-inv`** (ILI9341 + invertálás) — **a mi lapunkon mérve** | fehér háttér → nem ez az, próbáld az `esp32-2432s028r-st7789`-et |
+| „7789" felirat a dobozon | `esp32-2432s028r-st7789` | Piros és kék felcserélve → `-DTFT_RGB_ORDER=TFT_RGB`. Invertált színek → `-DTFT_INVERSION_ON=1` a `-DTFT_INVERSION_OFF=1` helyett. |
 
 A ST7789-es lap színsorrendjében **a források nem egyeznek**: a witnessmenow BGR-t ír, a rzeldent RGB-t. Az env a
-witnessmenow-féle beállítást követi. Ha a kép fejjel lefelé áll, azt a setup-oldal forgatás-pipája javítja, ugyanúgy,
-mint a dongle-on.
+witnessmenow-féle beállítást követi. Ha a kép fejjel lefelé áll, azt a setup-oldal forgatás-beállítása javítja,
+ugyanúgy, mint a dongle-on.
 
 ```sh
 cd ESP-ClaudeUsageMonitor
@@ -420,9 +445,11 @@ lásd 11.), engedélyezve. OAuth-nál a tokent a bejelentkezés adja; web-nél O
 
 ## 10. Display rotation
 
-A setup-oldal **Display & refresh** részén: profil-rotáció 1–60 s (alap 5 s), **180°-os elforgatás** (ha fejjel lefelé áll
-a dongle; NVS `flip`, azonnal érvényes, `tft.setRotation(3)` — ⚠ [vason mérendő], hogy az ST7735-ofszetek forgatva is
-stimmelnek-e), és a **usage-frissítés
+A setup-oldal **Display & refresh** részén: profil-rotáció 1–60 s (alap 5 s), **kijelző-forgatás** (a dongle-on 0°/180°,
+ha fejjel lefelé áll — `tft.setRotation(3)`, ⚠ [vason mérendő], hogy az ST7735-ofszetek forgatva is stimmelnek-e; a
+CYD-n 0°/90°/180°/270°, a 90/270 az álló elrendezésre vált. NVS `drot`, negyedfordulatban, azonnal érvényes; a régi
+`flip` beállítás és a régi mentés `displayFlip` mezője 180°-ként töltődik be. Dongle-ra importált 90°-os mentés 0°-ra
+esik vissza), és a **usage-frissítés
 profilonként 60–3600 s (alap 180 s)** — a usage lassan változik, a konzervatív alap kíméli a keretet és
 csökkenti a lábnyomot. A rotáció **csak a megjelenített profilt** cseréli, lekérést nem indít: 1 s-os
 rotációnál is a beállított frissítési idő marad. A „Claude requests since boot" számláló ezt mutatja.
@@ -653,8 +680,11 @@ a fájlok fejlécében; a jelszót fájlból olvassa (`CMON_PW_FILE`), a repóba
 - A tanúsítványlánc gyökere változhat (Cloudflare kiadót válthat) → új gyökér a `src/ca_certs.h`-ba.
 - `time_t` 32 bites (Arduino-ESP32 2.0.17) → 2038-ig.
 - Nincs OTA-frissítés: firmware csak USB-n.
-- **CYD (ESP32-2432S028R):** csak build és gépi render van, fizikai lapon semmi nem futott (2/b.). Nyitott: a
-  kijelző-driver és a színek, az olvashatóság, a képidő, és a heap-tartalék a TLS alatt. Az érintőképernyő nincs használva.
+- **CYD (ESP32-2432S028R):** egy lap-revízión mérve (2/b.): kijelző, színek, 0°/90°-os forgatás, Wi-Fi, HTTPS.
+  Nyitott: a másik két revízió, a 180°/270° a CYD-n, hogy a 90° a csatlakozóhoz képest merre fordít, a Wi-Fi-QR
+  telefonos beolvasása, a képidő. Az érintőképernyő nincs használva.
+- **Két eszköz ugyanazzal a Claude-belépéssel** (pl. az egyikről a másikra másolt beállítás): a Claude minden
+  frissítéskor lecseréli a refresh tokent, így amelyik másodiknak frissít, `RE-LOGIN NEEDED`-et kaphat. ⚠ még nem észlelt.
 
 ---
 

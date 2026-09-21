@@ -19,6 +19,8 @@
 
 uint32_t g_hostMillis = 1000000;
 std::vector<uint16_t> g_screen(320 * 240);
+int g_screenW = 320, g_screenH = 240;
+static uint8_t g_rot = 0;  // a kepekhez hasznalt kijelzo-forgatas (ClaudeBrief::displayRot)
 
 // --- A kijelzo altal hasznalt modulok stubjai (a valodi .cpp-k NVS-t / Wi-Fi-t / mutexet hasznalnak) ---
 static String g_ip = "192.168.100.111";
@@ -28,6 +30,9 @@ static LastKnownResets g_lk;
 WifiManager wifiManager;
 String WifiManager::ipString() const { return g_ip; }
 const char *WifiManager::stateName() const { return "CONNECTING"; }
+static int32_t g_apRetryMs = 272000;
+int32_t WifiManager::apRetryInMs() const { return g_apRetryMs; }
+bool WifiManager::apHasClients() const { return false; }
 ConfigManager configManager;
 ClaudeBrief ConfigManager::brief() { return g_brief; }
 UsageCache usageCache;
@@ -35,7 +40,7 @@ ProfileUsage UsageCache::get(int) { return g_pu; }
 LastKnownResets UsageCache::lastKnown(int) { return g_lk; }
 
 static void writePng(const std::string &path) {
-  const int w = 320, h = 240;
+  const int w = g_screenW, h = g_screenH;
   std::vector<unsigned char> raw;
   for (int y = 0; y < h; y++) {
     raw.push_back(0);
@@ -62,7 +67,7 @@ static void writePng(const std::string &path) {
   };
   static const unsigned char sig[8] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'};
   fwrite(sig, 1, 8, f);
-  chunk("IHDR", {0, 0, 1, 64, 0, 0, 0, 240, 8, 2, 0, 0, 0});  // 320x240, 8 bit RGB
+  chunk("IHDR", {0, 0, (unsigned char)(w >> 8), (unsigned char)w, 0, 0, (unsigned char)(h >> 8), (unsigned char)h, 8, 2, 0, 0, 0});  // 8 bit RGB
   chunk("IDAT", z);
   chunk("IEND", {});
   fclose(f);
@@ -73,6 +78,7 @@ static void setBrief(int count, const char *name) {
   g_brief.count = count;
   g_brief.rotationSec = 60;
   g_brief.refreshSec = 180;
+  g_brief.displayRot = g_rot;
   for (int i = 0; i < count; i++) {
     g_brief.idx[i] = i;
     strlcpy(g_brief.name[i], i == 0 ? name : "Other", sizeof(g_brief.name[i]));
@@ -96,13 +102,28 @@ static void shot(const std::string &dir, const char *name) {
   displayManager._rotPos = 0;
   displayManager._rotSinceMs = g_hostMillis;
   displayManager.loop();
-  writePng(dir + "/" + name + ".png");
-  printf("%s/%s.png\n", dir.c_str(), name);
+  std::string f = dir + "/" + (g_rot & 1 ? "allo_" : "") + name + ".png";
+  writePng(f);
+  printf("%s\n", f.c_str());
 }
+
+// Minden kep ket tajolasban: fekvo (alap) es allo (90 fok, "allo_" elotaggal).
+static void scenes(const std::string &dir);
 
 int main(int argc, char **argv) {
   std::string dir = argc > 1 ? argv[1] : ".";
   displayManager.begin();
+  for (uint8_t rot : {0, 1}) {
+    g_rot = rot;
+    wifiManager._state = WifiState::Connected;
+    setBrief(1, "x");
+    displayManager.applyRot(rot);
+    scenes(dir);
+  }
+  return 0;
+}
+
+static void scenes(const std::string &dir) {
 
   // 1) Ket keret, normal: 73 % es 12 % (heti: szerver-warning), 3 profil kozul az elso, friss adat.
   wifiManager._state = WifiState::Connected;
@@ -164,7 +185,7 @@ int main(int argc, char **argv) {
 
   // 9) Inditasi ablak.
   displayManager.showBoot(2400);
-  writePng(dir + "/9_boot.png");
-  printf("%s/9_boot.png\n", dir.c_str());
-  return 0;
+  std::string f = dir + "/" + (g_rot & 1 ? "allo_" : "") + "9_boot.png";
+  writePng(f);
+  printf("%s\n", f.c_str());
 }

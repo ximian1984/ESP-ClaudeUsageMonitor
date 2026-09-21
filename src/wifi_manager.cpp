@@ -61,6 +61,14 @@ void WifiManager::enterForcedSetup() {
 
 void WifiManager::requestReselect() { _reselectRequested = true; }
 
+int32_t WifiManager::apRetryInMs() const {
+  if (_scanPurpose == ScanPurpose::Select || _candIdx < _candidates.size()) return -1;
+  uint32_t elapsed = millis() - _stateSinceMs;
+  return elapsed >= WIFI_RETRY_FROM_AP_MS ? 0 : (int32_t)(WIFI_RETRY_FROM_AP_MS - elapsed);
+}
+
+bool WifiManager::apHasClients() const { return WiFi.softAPgetStationNum() > 0; }
+
 void WifiManager::requestScan() { webScanPending = true; }
 
 bool WifiManager::scanRunning() const { return webScanPending || _scanPurpose != ScanPurpose::None; }

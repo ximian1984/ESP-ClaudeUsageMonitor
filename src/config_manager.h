@@ -34,7 +34,10 @@ struct DeviceConfig {
   ClaudeProfile claude[MAX_CLAUDE_PROFILES];
   uint8_t rotationSec = ROTATION_DEFAULT_S;
   uint16_t refreshSec = CLAUDE_REFRESH_DEFAULT_S;  // profilonkenti API-frissites (spec 14.)
-  bool displayFlip = false;  // kijelzo 180 fokkal elforgatva (projektgazda, 2026-09-18) — ahogy a dongle all
+  // Kijelzo-forgatas negyedfordulatban (0 = alap, 1 = 90, 2 = 180, 3 = 270 fok). 180: projektgazda, 2026-09-18 (ahogy
+  // a dongle all); 90/270 csak a CYD-n (DISPLAY_QUARTER_TURNS), projektgazda, 2026-09-21. NVS "drot"; a regi "flip"
+  // bool-t betolteskor 180 fokka forditjuk.
+  uint8_t displayRot = 0;
   char apPassword[16] = "";  // egyszer generalt, NVS-ben marad
   char tz[TZ_POSIX_MAX + 1] = TZ_EUROPE_BUDAPEST;  // POSIX TZ (a kijelzett helyi idohoz)
 };
@@ -46,7 +49,7 @@ struct ClaudeBrief {
   char name[MAX_CLAUDE_PROFILES][CLAUDE_NAME_MAX + 1];
   uint8_t rotationSec = ROTATION_DEFAULT_S;
   uint16_t refreshSec = CLAUDE_REFRESH_DEFAULT_S;
-  bool displayFlip = false;
+  uint8_t displayRot = 0;
 };
 
 class ConfigManager {
@@ -69,7 +72,8 @@ class ConfigManager {
   bool saveClaude(int idx, const ClaudeProfile &p);
   bool deleteClaude(int idx);
   bool saveRotation(uint8_t sec);
-  bool saveDisplayFlip(bool flip);
+  bool saveDisplayRot(uint8_t rot);  // 0-3; a lapka altal nem tamogatottat (90/270 a dongle-on) elutasitja
+  static bool displayRotAllowed(int rot);
   bool saveRefreshSec(uint16_t sec);
   bool saveTimezone(const char *posixTz);
   ClaudeBrief brief();  // engedelyezett profilok neve+indexe, titok nelkul

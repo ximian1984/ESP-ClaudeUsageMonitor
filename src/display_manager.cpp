@@ -31,19 +31,19 @@ static void text(const String &s, int x, int y, uint16_t color, uint8_t font = 1
 
 // TFT_eSPI setRotation: 1 = fekvo (LilyGO examples/TFT_eSPI/TFT_eSPI.ino:35), 3 = ugyanaz 180 fokkal forgatva.
 // A framebuffer (sprite) valtozatlan marad, csak a kiirasa fordul — igy nem kell a rajzolo kodhoz nyulni.
-void DisplayManager::applyFlip(bool flip) {
-  if (_flip == (int)flip) return;
-  _flip = flip;
-  tft.setRotation(flip ? 3 : 1);
+void DisplayManager::applyRot(uint8_t rot) {
+  if (_rot == (int)rot) return;
+  _rot = rot;
+  tft.setRotation(rot == 2 ? 3 : 1);  // 90/270 itt nem lehet (config.h DISPLAY_QUARTER_TURNS 0)
   tft.fillScreen(TFT_BLACK);
-  Serial.printf("[disp] kijelzo-forgatas: %s\n", flip ? "180 fok" : "alap");
+  Serial.printf("[disp] kijelzo-forgatas: %s\n", rot == 2 ? "180 fok" : "alap");
 }
 
 void DisplayManager::begin() {
   pinMode(PIN_LCD_BL, OUTPUT);
   digitalWrite(PIN_LCD_BL, LCD_BL_ON);
   tft.init();
-  applyFlip(configManager.brief().displayFlip);
+  applyRot(configManager.brief().displayRot);
   tft.fillScreen(TFT_BLACK);
   fbOk = fb.createSprite(W, H) != nullptr;
   if (!fbOk) Serial.println("[disp] framebuffer foglalas sikertelen, kozvetlen rajzolas nincs — ures kijelzo");
@@ -120,7 +120,8 @@ static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, boo
       int by = y + 16;
       fb.drawRect(0, by, W, 6, TFT_DARKGREY);
       int fill = (int)((W - 2) * left / 100.0f);
-      if (fill > 0) fb.fillRect(1, by + 1, fill, 4, c == valColor ? TFT_GREEN : c);
+      // A csik a cimke folyamatos skalajat kapja (projektgazda, 2026-09-21); regi/lejart adatnal szurke.
+      if (fill > 0) fb.fillRect(1, by + 1, fill, 4, labelColor);
     }
   } else {
     text("?", W, y, TFT_DARKGREY, 2, TR_DATUM);
@@ -254,7 +255,7 @@ void DisplayManager::loop() {
   fb.fillSprite(TFT_BLACK);
 
   ClaudeBrief b = configManager.brief();
-  applyFlip(b.displayFlip);  // a setup-oldalon barmikor atallithato
+  applyRot(b.displayRot);  // a setup-oldalon barmikor atallithato
   g_staleMs = 2UL * (uint32_t)b.refreshSec * 1000UL;
   int n = b.count;
 
