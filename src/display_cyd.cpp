@@ -348,6 +348,15 @@ static void lkBlock(const Model &m, const char *label, time_t reset, int y) {
   resetRow(m, reset, y + 30, TFT_WHITE);
 }
 
+// "OK 18:21" (ma), "OK 09-20 18:21" (korabban); ha a sikernel meg nem volt NTP-ido, az adat kora ("7m OLD").
+static String lastOkText(time_t okEpoch, uint32_t ageS) {
+  if (okEpoch >= 1704067200) {
+    String dt = TimeManager::localDateTime(okEpoch);  // "2026-09-21 18:21"
+    return "OK " + (ageS < 20 * 3600 ? TimeManager::localHHMM(okEpoch) : dt.substring(5));
+  }
+  return ageS < 60 ? String(ageS) + "s" : ageS < 3600 ? String(ageS / 60) + "m OLD" : String(ageS / 3600) + "h OLD";
+}
+
 static void drawLastKnown(const Model &m) {
   drawHeader(m, m.sta ? "NO DATA" : "NO WIFI", TFT_RED, "");
   text("last known resets", 6, 38, TFT_DARKGREY, 2);
@@ -355,7 +364,7 @@ static void drawLastKnown(const Model &m) {
   lkBlock(m, "SESSION", m.lk.sessionReset, 60);
   lkBlock(m, "WEEKLY", m.lk.weeklyReset, 60 + step);
   String saved = m.lk.savedEpoch >= 1704067200 ? TimeManager::localDateTime(m.lk.savedEpoch).substring(5) : String("?");
-  text("data from " + saved, 6, 60 + 2 * step + 8, TFT_DARKGREY, 2);
+  text("last OK " + saved, 6, 60 + 2 * step + 8, TFT_LIGHTGREY, 2);  // az utolso sikeres lekeres (usage_cache)
   drawFooter(m);
 }
 
@@ -387,8 +396,8 @@ static void drawProfile(const Model &m) {
   }
   bool stale = u.hasData && m.nowMs - u.lastOkMs > g_staleMs;
   if (u.hasData) {
-    uint32_t ageS = (m.nowMs - u.lastOkMs) / 1000;
-    age = ageS < 60 ? String(ageS) + "s" : ageS < 3600 ? String(ageS / 60) + "m OLD" : String(ageS / 3600) + "h OLD";
+    // Az utolso SIKERES lekeres ideje oraidovel (projektgazda, 2026-09-21): "OK 18:21"; NTP-ido nelkul az adat kora.
+    age = lastOkText(u.lastOkEpoch, (m.nowMs - u.lastOkMs) / 1000);
     if (status.isEmpty()) {
       status = age;
       sc = stale ? TFT_YELLOW : TFT_DARKGREY;

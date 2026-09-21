@@ -21,7 +21,7 @@ struct ProfileUsage {
 struct LastKnownResets {
   time_t sessionReset = 0;
   time_t weeklyReset = 0;
-  time_t savedEpoch = 0;  // mikor volt ervenyes az adat
+  time_t savedEpoch = 0;  // az utolso SIKERES lekeres ideje (minden sikernel NVS-be kerul)
   bool any() const { return sessionReset || weeklyReset; }
 };
 

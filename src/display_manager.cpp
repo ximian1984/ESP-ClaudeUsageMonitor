@@ -159,7 +159,7 @@ void DisplayManager::drawLastKnown(const char *name, const LastKnownResets &lk) 
   lkBlock("SESSION (last known)", lk.sessionReset, 17);
   lkBlock("WEEKLY (last known)", lk.weeklyReset, 40);
   String saved = lk.savedEpoch >= 1704067200 ? TimeManager::localDateTime(lk.savedEpoch).substring(5) : String("?");
-  text("data from " + saved, 0, 68, TFT_DARKGREY);  // "data from 09-17 15:54" = 21 kar.
+  text("last OK " + saved, 0, 68, TFT_LIGHTGREY);  // az utolso sikeres lekeres; "last OK 09-17 15:54" = 19 kar.
 }
 
 void DisplayManager::drawProfile(int idx, const char *name) {
@@ -213,7 +213,9 @@ void DisplayManager::drawProfile(int idx, const char *name) {
   bool stale = u.hasData && now - u.lastOkMs > g_staleMs;
   if (u.hasData) {
     uint32_t ageS = (now - u.lastOkMs) / 1000;
-    String age = ageS < 60 ? String(ageS) + "s" : ageS < 3600 ? String(ageS / 60) + "m OLD" : String(ageS / 3600) + "h OLD";
+    // Az utolso SIKERES lekeres oraidovel (projektgazda, 2026-09-21): "OK 18:21"; NTP-ido nelkul az adat kora.
+    String age = u.lastOkEpoch >= 1704067200 ? "OK " + TimeManager::localHHMM(u.lastOkEpoch)
+               : ageS < 60 ? String(ageS) + "s" : ageS < 3600 ? String(ageS / 60) + "m OLD" : String(ageS / 3600) + "h OLD";
     if (status.isEmpty()) {
       status = age;
       sc = stale ? TFT_YELLOW : TFT_DARKGREY;

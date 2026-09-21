@@ -131,6 +131,7 @@ static void scenes(const std::string &dir) {
   g_pu = ProfileUsage();
   g_pu.hasData = true;
   g_pu.lastOkMs = g_hostMillis - 12000;
+  g_pu.lastOkEpoch = time(nullptr) - 12;
   g_pu.data.limits[0] = limit(LimitKind::Session, "SESSION", 27, 2 * 3600 + 17 * 60 + 32);
   g_pu.data.limits[1] = limit(LimitKind::Weekly, "WEEKLY", 88, 3 * 86400 + 4 * 3600 + 12 * 60, Severity::Warning);
   g_pu.data.count = 2;
@@ -141,6 +142,7 @@ static void scenes(const std::string &dir) {
   g_pu.lastError = FetchError::RateLimited;
   g_pu.lastHttpStatus = 429;
   g_pu.lastOkMs = g_hostMillis + 1000 - 7 * 60 * 1000;
+  g_pu.lastOkEpoch = time(nullptr) - 7 * 60;
   shot(dir, "2_hiba_regi_adat");
 
   // 3) Szelsoertekek: 0 % (piros) es 100 %, hosszu (12 karakteres) profilnev.

@@ -74,18 +74,21 @@ void UsageCache::storeSuccess(int idx, const UsageData &d, time_t epochNow) {
   nk.weeklyReset = (lw && lw->hasReset) ? lw->resetAt : 0;
   nk.savedEpoch = epochNow;
   bool write = differs(nk.sessionReset, _lk[idx].sessionReset) || differs(nk.weeklyReset, _lk[idx].weeklyReset);
-  _lk[idx] = nk;  // RAM-ban mindig friss; NVS-be csak valtozaskor (flash-kopas)
+  _lk[idx] = nk;  // RAM-ban mindig friss
   xSemaphoreGive(_mtx);
 
-  if (write) {
-    Preferences pr;
-    if (pr.begin(NS_LK, false)) {
+  // A resetek csak valtozaskor mennek NVS-be; az utolso SIKER ideje ('t') minden sikernel (projektgazda, 2026-09-21:
+  // a kijelzon ujrainditas utan is latszodjon, mikor sikerult utoljara). 3 percenkent egy 8 bajtos bejegyzes: az NVS
+  // kopasa ettol elhanyagolhato (~20 iras/ora, a 20 KB-os particio lapjai korbeforognak).
+  Preferences pr;
+  if ((write || epochNow >= 1704067200) && pr.begin(NS_LK, false)) {
+    if (write) {
       pr.putULong64(lkKey(idx, 's').c_str(), (uint64_t)nk.sessionReset);
       pr.putULong64(lkKey(idx, 'w').c_str(), (uint64_t)nk.weeklyReset);
-      pr.putULong64(lkKey(idx, 't').c_str(), (uint64_t)nk.savedEpoch);
-      pr.end();
       Serial.printf("[cache] profil %d: utolso ismert reset NVS-be mentve\n", idx);
     }
+    pr.putULong64(lkKey(idx, 't').c_str(), (uint64_t)nk.savedEpoch);
+    pr.end();
   }
 }
 

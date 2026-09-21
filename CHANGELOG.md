@@ -32,6 +32,11 @@ hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletez
   A host-renderer mindkét tájolást kirajzolja (`allo_*.png`).
 
 ### Módosítva
+- **Az utolsó sikeres lekérés ideje a kijelzőn** (projektgazda), mindkét lapon: a fejlécben `OK 18:21` (hibánál két
+  sorban `ERR 429` / `OK 18:21`); a „NO DATA" képernyőn `last OK 09-21 18:21`. NTP-idő nélkül az adat kora marad.
+  **Javítva:** a „data from …" eddig az utolsó reset-*változás* idejét mutatta, mert az NVS-be csak akkor írt; újraindulás
+  után ez órákkal régebbi lehetett (mérve: „data from 09-21 17:22", miközben 18:2x-kor még sikerült lekérni). Most minden
+  sikernél elmenti az időt (NVS `lk<N>t`, ~20 írás/óra, a kopás elhanyagolható). ⚠ Flashelve még nincs (429 alatt).
 - **Keret-csíkok új színezése** (projektgazda), a dongle-on és a CYD-n is. Régi/lejárt adatnál szürke, mint a címke:
   - a szín mindkettőnél **egyetlen tónus a maradék szerint** (ugyanaz, mint a címke): tele zöld, 50 %-nál sárga,
     elfogyva piros. 12 % fogyásnál tehát zöld, mert 88 % van hátra;
