@@ -205,8 +205,8 @@ display differs: it has its own **native 320×240 (landscape) layout**
 
 - **header:** profile name, and on the right the data age or the error (`ERR 429` + `7m OLD`);
 - **one block per quota:** the label coloured by the remainder, the **used %** in large digits on the right, a bar
-  below it (SESSION: the **used** part, a green-to-red gradient along the bar; WEEKLY: the **remaining** part in one tone
-  that turns from green to red as it runs out), and the **countdown in large type** with the reset date beside it in small type (`RST 02:17:32  @09.20 00:02`);
+  below it (one tone set by the remainder, like the label — green while plenty is left, red when it runs out; SESSION's bar
+  is as long as the **used** part, WEEKLY's as long as the **remaining** part), and the **countdown in large type** with the reset date beside it in small type (`RST 02:17:32  @09.20 00:02`);
 - **footer:** the setup page address (`http://<IP>`), plus the index when there are several profiles (`1/3`).
 
 The error screens (setup AP, `RE-LOGIN NEEDED`, last known resets, loading) are the same as on the dongle, just larger.

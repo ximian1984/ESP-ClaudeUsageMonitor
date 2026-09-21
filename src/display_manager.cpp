@@ -120,17 +120,11 @@ static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, boo
     if (bar) {
       int by = y + 16;
       fb.drawRect(0, by, W, 6, TFT_DARKGREY);
-      // Csik (projektgazda, 2026-09-21), regi/lejart adatnal szurke: SESSION = a FOGYAS, balrol tolt, szinatmenettel
-      // (bal szel zold, jobb szel piros); WEEKLY (es a tobbi) = a MARADEK, egy tonussal, ami fogyva pirosodik (= cimke).
-      bool grey = labelColor == TFT_LIGHTGREY;
-      if (l->kind == LimitKind::Session) {
-        int fill = (int)((W - 2) * (100.0f - left) / 100.0f);
-        for (int i = 0; i < fill; i++)
-          fb.drawFastVLine(1 + i, by + 1, 4, grey ? TFT_LIGHTGREY : usageColor565(100.0f - 100.0f * i / (W - 3)));
-      } else {
-        int fill = (int)((W - 2) * left / 100.0f);
-        if (fill > 0) fb.fillRect(1, by + 1, fill, 4, labelColor);
-      }
+      // Csik (projektgazda, 2026-09-21): egy tonus a MARADEK szerint (= cimke; regi/lejart adatnal szurke). Hossza:
+      // SESSION = a FOGYAS, WEEKLY (es a tobbi) = a MARADEK.
+      float frac = l->kind == LimitKind::Session ? 100.0f - left : left;
+      int fill = (int)((W - 2) * frac / 100.0f);
+      if (fill > 0) fb.fillRect(1, by + 1, fill, 4, labelColor);
     }
   } else {
     text("?", W, y, TFT_DARKGREY, 2, TR_DATUM);

@@ -33,12 +33,12 @@ hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletez
 
 ### Módosítva
 - **Keret-csíkok új színezése** (projektgazda), a dongle-on és a CYD-n is. Régi/lejárt adatnál szürke, mint a címke:
-  - **SESSION:** a **fogyást** mutatja, balról tölt, színátmenettel: a bal széle zöld, a jobb széle (100 % elfogyott) piros;
-  - **WEEKLY** (és a többi keret): a **maradékot** mutatja, egyetlen tónussal, ami a fogyással folyamatosan vált:
-    tele zöld, 50 %-nál sárga, elfogyva piros (ugyanaz, mint a címke).
+  - a szín mindkettőnél **egyetlen tónus a maradék szerint** (ugyanaz, mint a címke): tele zöld, 50 %-nál sárga,
+    elfogyva piros. 12 % fogyásnál tehát zöld, mert 88 % van hátra;
+  - **SESSION:** a hossza a **fogyás**; **WEEKLY** (és a többi keret): a hossza a **maradék** (projektgazda döntése).
   - Eddig mindkettő a maradékot mutatta, és 30 % maradékig tiszta zöld volt, ezért nem sárgult.
-  - Közbülső próbálkozások (elvetve): mindkét csík egy tónussal; majd mindkettő helyzet szerinti átmenettel. A
-    projektgazda a két keretet eltérően olvassa: a session a fogyás, a heti egy fogyó érték.
+  - Közbülső próbálkozások (elvetve): helyzet szerinti színátmenet a csík mentén (a maradékra, majd a fogyásra) — a
+    projektgazda a színt a maradék jelzéseként olvassa, nem skálaként.
 - **A kijelzett szám a fogyás** („69 % used"), a maradék helyett, mindkét lapon (projektgazda): így egyezik a
   claude.ai Usage oldalával. Előtte a projektgazda a „31 % left"-et fogyásnak olvasta; az adat jó volt (claude.ai:
   session 7 % / heti 69 % used = kijelző 93 % / 31 % left). A szám színe továbbra is a maradékból jön.
