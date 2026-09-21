@@ -230,6 +230,11 @@ a sáv-sprite 240×40-esre (19,2 KB) jön létre újra, egy kép 8 sáv.
 nincs, ezért kérésre ugyanaz a rajzoló kód sávonként újra kirajzolja, és sávonként küldi el (6 × 25,6 KB = 153,6 KB
 képenként, másodpercenként egyszer, amíg a tükör nyitva van). A dongle-on marad a 160×80.
 
+![A CYD állva (90°): SESSION 7% used, WEEKLY 69% used](docs/cyd/photo_cyd_portrait.jpg)
+
+*Fotó, 2026-09-21: a CYD állva (90°), `esp32-2432s028r-inv`. Ugyanekkor a claude.ai-on: session 7 % used, heti (all
+models) 69 % used.*
+
 **Vason mérve (2026-09-21)**, USB-C + micro-USB-s lapon (ESP32-D0WD-V3 rev 3.1, 4 MB, CH340):
 
 | Mit | Eredmény |
