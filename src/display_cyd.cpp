@@ -290,8 +290,8 @@ static void resetRow(const Model &m, time_t resetAt, int y, uint16_t color) {
 static int resetH() { return P ? 44 : 26; }
 
 // Egy limit blokkja (y .. y+92; allva y+110, mert a reset datuma kulon sorba kerul):
-//   cimke (4-es, a maradek szerinti szinnel) + alatta "used"      |  jobbra a nagy szazalek (6-os szam + 4-es "%")
-//   sav (y+52, 12 px magas)
+//   cimke (4-es, a maradek szerinti szinnel) + mellette "used"    |  jobbra a nagy szazalek (6-os szam + 4-es "%")
+//   "remaining" + sav (y+52, 12 px magas; a maradek)
 //   reset: resetRow() (y+66)
 static void drawLimit(const Model &m, const UsageLimit *l, const char *fallbackLabel, int y, bool dataStale) {
   if (!l) {
@@ -313,17 +313,24 @@ static void drawLimit(const Model &m, const UsageLimit *l, const char *fallbackL
     bool warn = l->severity == Severity::Warning || left < 30;
     uint16_t c = resetPassed ? TFT_DARKGREY : (left < 10 ? TFT_RED : warn ? TFT_YELLOW : valColor);
     // A szam a FOGYAS, mint a claude.ai Usage oldalan ("69% used"; projektgazda, 2026-09-21). A szin a maradekbol jon.
-    text("used", 6, y + 30, TFT_DARKGREY, 2);
+    // "used" kozvetlenul a cimke utan (projektgazda, 2026-09-21: "SESSION used"), a 4-es cimke alapvonalan. Ha
+    // utkozne a nagy szammal (allva, 100 %-nal), a cimke ala kerul.
+    String num = String((int)(100.0f - left + 0.5f));
     int pw = band.textWidth("%", 4);
+    int numX = R - pw - 2 - band.textWidth(num, 6);
+    int ux = 6 + band.textWidth(l->label, 4) + 6;
+    if (ux + band.textWidth("used", 2) + 6 <= numX) text("used", ux, y + 10, TFT_LIGHTGREY, 2);
+    else text("used", 6, y + 30, TFT_LIGHTGREY, 2);
     text("%", R, y + 20, c, 4, TR_DATUM);  // a 26 px-es "%" alja a 48 px-es szamok aljahoz
-    text(String((int)(100.0f - left + 0.5f)), R - pw - 2, y, c, 6, TR_DATUM);
-    drawRectS(6, y + 52, W - 12, 12, TFT_DARKGREY);
-    // Csik (projektgazda, 2026-09-21): egyetlen tonus a MARADEK szerint (= a cimke szine: tele zold, fogyva sarga,
-    // elfogyva piros; regi/lejart adatnal szurke). A hossza: SESSION = a FOGYAS (12 % used -> rovid, de zold, mert
-    // 88 % van hatra), WEEKLY (es a tobbi) = a MARADEK.
-    float frac = l->kind == LimitKind::Session ? 100.0f - left : left;
-    int fill = (int)((W - 14) * frac / 100.0f);
-    if (fill > 0) fillRectS(7, y + 53, fill, 10, labelColor);
+    text(num, R - pw - 2, y, c, 6, TR_DATUM);
+    // Csik (projektgazda, 2026-09-21): MINDKET limitnel a MARADEK, elotte "remaining" felirattal (a szam a fogyas,
+    // a csik a maradek — kiirva, hogy ne legyen felreertheto). Egyetlen tonus a maradek szerint (= a cimke szine:
+    // tele zold, fogyva sarga, elfogyva piros; regi/lejart adatnal szurke).
+    int bx = 6 + band.textWidth("remaining", 2) + 6;
+    text("remaining", 6, y + 50, TFT_LIGHTGREY, 2);
+    drawRectS(bx, y + 52, R - bx, 12, TFT_DARKGREY);
+    int fill = (int)((R - bx - 2) * left / 100.0f);
+    if (fill > 0) fillRectS(bx + 1, y + 53, fill, 10, labelColor);
   } else {
     text("?", R, y + 12, TFT_DARKGREY, 4, TR_DATUM);
   }

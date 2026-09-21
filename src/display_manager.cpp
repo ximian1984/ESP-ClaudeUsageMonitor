@@ -92,7 +92,7 @@ void DisplayManager::drawNoProfiles() {
   text("http://" + wifiManager.ipString(), 0, 56, TFT_CYAN);
 }
 
-// Egy limit ket sora: "LABEL   27% USED" + (opcionalis savval) "RST 02:17:32 @09.17 18:40" / "RST 3d04:12:33 09.24 09:00"
+// Egy limit ket sora: "LABEL used   27%" + "remaining [csik]" + (opcionalis savval) "RST 02:17:32 @09.17 18:40" / "RST 3d04:12:33 09.24 09:00"
 // Az ido a beallitott idozonaban (setup-oldal, NVS "tz").
 static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, bool bar, bool dataStale) {
   uint16_t valColor = dataStale ? TFT_DARKGREY : TFT_WHITE;
@@ -116,15 +116,18 @@ static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, boo
     bool warn = l->severity == Severity::Warning || left < 30;
     uint16_t c = resetPassed ? TFT_DARKGREY : (left < 10 ? TFT_RED : warn ? TFT_YELLOW : valColor);
     // A szam a FOGYAS, mint a claude.ai Usage oldalan (projektgazda, 2026-09-21). A szin a maradekbol jon.
-    text(String((int)(100.0f - left + 0.5f)) + "% USED", W, y, c, 2, TR_DATUM);
+    // "SESSION used   27%" (projektgazda, 2026-09-21): a "used" a cimke utan all, nem a szam utan.
+    text("used", fb.textWidth(l->label, 1) + 6, y + 4, TFT_LIGHTGREY);
+    text(String((int)(100.0f - left + 0.5f)) + "%", W, y, c, 2, TR_DATUM);
     if (bar) {
+      // Csik (projektgazda, 2026-09-21): MINDKET limitnel a MARADEK, elotte "remaining" felirattal. Egy tonus a
+      // maradek szerint (= cimke; regi/lejart adatnal szurke).
       int by = y + 16;
-      fb.drawRect(0, by, W, 6, TFT_DARKGREY);
-      // Csik (projektgazda, 2026-09-21): egy tonus a MARADEK szerint (= cimke; regi/lejart adatnal szurke). Hossza:
-      // SESSION = a FOGYAS, WEEKLY (es a tobbi) = a MARADEK.
-      float frac = l->kind == LimitKind::Session ? 100.0f - left : left;
-      int fill = (int)((W - 2) * frac / 100.0f);
-      if (fill > 0) fb.fillRect(1, by + 1, fill, 4, labelColor);
+      int bx = fb.textWidth("remaining", 1) + 4;
+      text("remaining", 0, by - 1, TFT_LIGHTGREY);
+      fb.drawRect(bx, by, W - bx, 6, TFT_DARKGREY);
+      int fill = (int)((W - bx - 2) * left / 100.0f);
+      if (fill > 0) fb.fillRect(bx + 1, by + 1, fill, 4, labelColor);
     }
   } else {
     text("?", W, y, TFT_DARKGREY, 2, TR_DATUM);

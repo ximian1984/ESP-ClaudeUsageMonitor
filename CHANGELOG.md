@@ -20,6 +20,16 @@ hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletez
     feldolgozva (3 limit); utána 153 780 B szabad, mélypont 94 540 B. A klasszikus ESP32-nek elég.
 - Zsákutca: a „két csatlakozó = ST7789" szabály (közösségi forrásokból) erre a lapra nem állt; ILI9341 volt.
 
+### Módosítva (este)
+- **Egyértelmű feliratok** (projektgazda): a címke után `used` (`SESSION used   27%`, `WEEKLY used   88%`; a dongle-on a
+  szám mögül a `USED` elmaradt), a csík előtt `remaining`. A **csík mindkét keretnél a maradék** hossza (eddig a SESSION-é
+  a fogyásé volt — ez a kettő együtt zavaró volt). A szín változatlan: egy tónus a maradék szerint (zöld → sárga → piros).
+  CYD-n állva, 100 %-nál a `used` a címke alá kerül, hogy ne ütközzön a nagy számmal. Mindkét eszközön `[vason mérve]`.
+- Zsákutca (flash): a CYD-re a sima `esp32-2432s028r` env került → fehér háttér, invertált színek; ezen a lapon az
+  `esp32-2432s028r-inv` kell. A dongle `No serial data received`-del nem fogadta a feltöltést, amíg BOOT-tal újra nem
+  lett dugva; az `esptool --before no_reset` próbakapcsolódás ekkor sem ment át, a `pio … -t upload` igen. Flash után
+  egyszer `ASSOC_FAIL`-lel AP-módba esett (a profilok megvoltak), egy újraindítás után csatlakozott.
+
 ### Hozzáadva
 - `esp32-2432s028r-inv` env: ILI9341 + invertálás, a fenti lapra.
 - **CYD setup-AP: Wi-Fi QR-kód** (`WIFI:T:WPA;…`) a szöveg mellett, hogy a telefon gépelés nélkül csatlakozzon

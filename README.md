@@ -30,9 +30,9 @@ Changes: [`CHANGELOG.md`](CHANGELOG.md)
 itself how much of your quota is left and when it renews.
 
 ### What you see on the display
-- Per profile: the **name**, the **session (5-hour)** and the **weekly** quota **percentage used** (as on claude.ai's Usage page), a **bar** for
-  each, and **when it renews** (countdown to the second plus date: `RST 02:03:46 @09.18 12:30`).
-- The **label colour** shifts from green through yellow to red as the remainder drops.
+- Per profile: the **name**, the **session (5-hour)** and the **weekly** quota **percentage used** (as on claude.ai's Usage page, labelled `SESSION used` / `WEEKLY used`), a
+  **remaining** bar for each, and **when it renews** (countdown to the second plus date: `RST 02:03:46 @09.18 12:30`).
+- The **label and bar colour** shifts from green through yellow to red as the remainder drops.
 - With several profiles it **cycles automatically** (1–60 s, configurable).
 - The top-right corner alternates every 3 seconds between the **IP address** and the **status** (data age, `NO WIFI`,
   `ERR 403`, …).
@@ -204,9 +204,9 @@ display differs: it has its own **native 320×240 (landscape) layout**
 ([`src/display_cyd.cpp`](src/display_cyd.cpp)) with larger type:
 
 - **header:** profile name, and on the right the data age or the error (`ERR 429` + `7m OLD`);
-- **one block per quota:** the label coloured by the remainder, the **used %** in large digits on the right, a bar
-  below it (one tone set by the remainder, like the label — green while plenty is left, red when it runs out; SESSION's bar
-  is as long as the **used** part, WEEKLY's as long as the **remaining** part), and the **countdown in large type** with the reset date beside it in small type (`RST 02:17:32  @09.20 00:02`);
+- **one block per quota:** the label coloured by the remainder, the **used %** in large digits on the right, `used` right
+  after the label, a `remaining` bar below it (for **both** quotas the bar is as long as the **remaining** part; one tone set
+  by the remainder, like the label — green while plenty is left, red when it runs out), and the **countdown in large type** with the reset date beside it in small type (`RST 02:17:32  @09.20 00:02`);
 - **footer:** the setup page address (`http://<IP>`), plus the index when there are several profiles (`1/3`).
 
 The error screens (setup AP, `RE-LOGIN NEEDED`, last known resets, loading) are the same as on the dongle, just larger.
@@ -474,11 +474,11 @@ Display layout:
 
 ```
 xiTech                     12s      0   profile name (+ IP / status top right)
-SESSION             27% USED        16  label + used
-[██████████████░░░░░░░░░░░░░]       32  bar
+SESSION used              27%       16  label + used
+remaining [███████████░░░░]         32  bar = remaining
 RST 04:49:27 @09.17 21:00           40  reset
-WEEKLY              41% USED        48
-[████████████████████░░░░░░░]       64  bar
+WEEKLY used               41%       48
+remaining [█████████░░░░░░]         64  bar = remaining
 RST 3d04:12:33 09.24 09:00          72
 ```
 

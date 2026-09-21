@@ -28,9 +28,9 @@ Változások: [`CHANGELOG.md`](CHANGELOG.md)
 a keretedből és mikor újul meg.
 
 ### Amit a kijelzőn látsz
-- Profilonként: a **név**, a **session (5 órás)** és a **heti** keret **fogyása százalékban** (mint a claude.ai Usage oldalán), mindkettőhöz **sáv**, és hogy
+- Profilonként: a **név**, a **session (5 órás)** és a **heti** keret **fogyása százalékban** (mint a claude.ai Usage oldalán; felirat: `SESSION used` / `WEEKLY used`), mindkettőhöz **maradék-sáv** (`remaining`), és hogy
   **mikor újul meg** (visszaszámláló másodpercre + dátum: `RST 02:03:46 @09.18 12:30`).
-- A **címke színe** a maradék szerint zöldből sárgán át pirosba vált.
+- A **címke és a sáv színe** a maradék szerint zöldből sárgán át pirosba vált.
 - Több profil esetén **magától váltogat** (1–60 s, állítható).
 - A jobb felső sarok 3 másodpercenként az **IP-címet** és az **állapotot** mutatja (adat kora, `NO WIFI`, `ERR 403`…).
 - Wi-Fi nélkül vagy adat híján az **utolsó ismert reset-időpontokat** mutatja (ezek újraindítást is túlélnek).
@@ -200,9 +200,9 @@ más: **saját, natív 320×240-es (fekvő) elrendezése** van ([`src/display_cy
 betűkkel:
 
 - **fejléc:** profilnév, jobbra az adat kora vagy a hiba (`ERR 429` + `7m OLD`);
-- **keretenként egy blokk:** a címke a maradék szerint színezve, jobbra nagy számmal a **fogyás %** (used), alatta sáv (egy
-  tónus a maradék szerint, mint a címke — amíg sok van hátra, zöld, elfogyva piros; a SESSION csík hossza a **fogyás**, a
-  WEEKLY-é a **maradék**), és a
+- **keretenként egy blokk:** a címke a maradék szerint színezve, jobbra nagy számmal a **fogyás %**, a címke után `used`, alatta
+  `remaining` sáv (**mindkét** keretnél a **maradék** hossza; egy tónus a maradék szerint, mint a címke — amíg sok van
+  hátra, zöld, elfogyva piros), és a
   **visszaszámlálás nagy betűvel**, mellette kicsiben a reset dátuma (`RST 02:17:32  @09.20 00:02`);
 - **lábléc:** a setup-oldal címe (`http://<IP>`), több profilnál a sorszám (`1/3`).
 
@@ -470,11 +470,11 @@ Kijelző-elrendezés:
 
 ```
 xiTech                     12s      0   profilnév (+ jobb felül IP / állapot)
-SESSION             27% USED        16  cimke + fogyás
-[██████████████░░░░░░░░░░░░░]       32  sáv
+SESSION used              27%       16  cimke + fogyás
+remaining [███████████░░░░]         32  sáv = maradék
 RST 04:49:27 @09.17 21:00           40  reset
-WEEKLY              41% USED        48
-[████████████████████░░░░░░░]       64  sáv (2026-09-18 óta a hetinek is van)
+WEEKLY used               41%       48
+remaining [█████████░░░░░░]         64  sáv = maradék
 RST 3d04:12:33 09.24 09:00          72
 ```
 
