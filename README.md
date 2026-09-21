@@ -30,7 +30,7 @@ Changes: [`CHANGELOG.md`](CHANGELOG.md)
 itself how much of your quota is left and when it renews.
 
 ### What you see on the display
-- Per profile: the **name**, the **session (5-hour)** and the **weekly** quota **percentage remaining**, a **bar** for
+- Per profile: the **name**, the **session (5-hour)** and the **weekly** quota **percentage used** (as on claude.ai's Usage page), a **bar** for
   each, and **when it renews** (countdown to the second plus date: `RST 02:03:46 @09.18 12:30`).
 - The **label colour** shifts from green through yellow to red as the remainder drops.
 - With several profiles it **cycles automatically** (1–60 s, configurable).
@@ -204,7 +204,7 @@ display differs: it has its own **native 320×240 (landscape) layout**
 ([`src/display_cyd.cpp`](src/display_cyd.cpp)) with larger type:
 
 - **header:** profile name, and on the right the data age or the error (`ERR 429` + `7m OLD`);
-- **one block per quota:** the label coloured by the remainder, the **remaining %** in large digits on the right, a bar
+- **one block per quota:** the label coloured by the remainder, the **used %** in large digits on the right, a bar
   below it (SESSION: the **used** part, a green-to-red gradient along the bar; WEEKLY: the **remaining** part in one tone
   that turns from green to red as it runs out), and the **countdown in large type** with the reset date beside it in small type (`RST 02:17:32  @09.20 00:02`);
 - **footer:** the setup page address (`http://<IP>`), plus the index when there are several profiles (`1/3`).
@@ -469,10 +469,10 @@ Display layout:
 
 ```
 xiTech                     12s      0   profile name (+ IP / status top right)
-SESSION             73% LEFT        16  label + remaining
+SESSION             27% USED        16  label + used
 [██████████████░░░░░░░░░░░░░]       32  bar
 RST 04:49:27 @09.17 21:00           40  reset
-WEEKLY              59% LEFT        48
+WEEKLY              41% USED        48
 [████████████████████░░░░░░░]       64  bar
 RST 3d04:12:33 09.24 09:00          72
 ```

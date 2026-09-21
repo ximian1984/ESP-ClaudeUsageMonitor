@@ -92,7 +92,7 @@ void DisplayManager::drawNoProfiles() {
   text("http://" + wifiManager.ipString(), 0, 56, TFT_CYAN);
 }
 
-// Egy limit ket sora: "LABEL   73% LEFT" + (opcionalis savval) "RST 02:17:32 @09.17 18:40" / "RST 3d04:12:33 09.24 09:00"
+// Egy limit ket sora: "LABEL   27% USED" + (opcionalis savval) "RST 02:17:32 @09.17 18:40" / "RST 3d04:12:33 09.24 09:00"
 // Az ido a beallitott idozonaban (setup-oldal, NVS "tz").
 static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, bool bar, bool dataStale) {
   uint16_t valColor = dataStale ? TFT_DARKGREY : TFT_WHITE;
@@ -115,7 +115,8 @@ static void drawLimit(const UsageLimit *l, const char *fallbackLabel, int y, boo
     // A szerver severity-je (mert: "warning" 81 %-os hasznalatnal) is sargara szinez; a kuszobok a tartalek alakra.
     bool warn = l->severity == Severity::Warning || left < 30;
     uint16_t c = resetPassed ? TFT_DARKGREY : (left < 10 ? TFT_RED : warn ? TFT_YELLOW : valColor);
-    text(String((int)(left + 0.5f)) + "% LEFT", W, y, c, 2, TR_DATUM);
+    // A szam a FOGYAS, mint a claude.ai Usage oldalan (projektgazda, 2026-09-21). A szin a maradekbol jon.
+    text(String((int)(100.0f - left + 0.5f)) + "% USED", W, y, c, 2, TR_DATUM);
     if (bar) {
       int by = y + 16;
       fb.drawRect(0, by, W, 6, TFT_DARKGREY);

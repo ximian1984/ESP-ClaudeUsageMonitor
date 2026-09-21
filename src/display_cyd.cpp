@@ -290,7 +290,7 @@ static void resetRow(const Model &m, time_t resetAt, int y, uint16_t color) {
 static int resetH() { return P ? 44 : 26; }
 
 // Egy limit blokkja (y .. y+92; allva y+110, mert a reset datuma kulon sorba kerul):
-//   cimke (4-es, a maradek szerinti szinnel) + alatta "left"      |  jobbra a nagy szazalek (6-os szam + 4-es "%")
+//   cimke (4-es, a maradek szerinti szinnel) + alatta "used"      |  jobbra a nagy szazalek (6-os szam + 4-es "%")
 //   sav (y+52, 12 px magas)
 //   reset: resetRow() (y+66)
 static void drawLimit(const Model &m, const UsageLimit *l, const char *fallbackLabel, int y, bool dataStale) {
@@ -312,10 +312,11 @@ static void drawLimit(const Model &m, const UsageLimit *l, const char *fallbackL
     // A szerver severity-je (mert: "warning" 81 %-os hasznalatnal) is sargara szinez (ugyanaz, mint a dongle-on).
     bool warn = l->severity == Severity::Warning || left < 30;
     uint16_t c = resetPassed ? TFT_DARKGREY : (left < 10 ? TFT_RED : warn ? TFT_YELLOW : valColor);
-    text("left", 6, y + 30, TFT_DARKGREY, 2);
+    // A szam a FOGYAS, mint a claude.ai Usage oldalan ("69% used"; projektgazda, 2026-09-21). A szin a maradekbol jon.
+    text("used", 6, y + 30, TFT_DARKGREY, 2);
     int pw = band.textWidth("%", 4);
     text("%", R, y + 20, c, 4, TR_DATUM);  // a 26 px-es "%" alja a 48 px-es szamok aljahoz
-    text(String((int)(left + 0.5f)), R - pw - 2, y, c, 6, TR_DATUM);
+    text(String((int)(100.0f - left + 0.5f)), R - pw - 2, y, c, 6, TR_DATUM);
     drawRectS(6, y + 52, W - 12, 12, TFT_DARKGREY);
     // Csik (projektgazda, 2026-09-21), regi/lejart adatnal szurke, mint a cimke:
     //  - SESSION: a FOGYAST mutatja, balrol tolt, szinatmenettel (bal szel zold, jobb szel = 100 % elfogyott piros);

@@ -28,7 +28,7 @@ Változások: [`CHANGELOG.md`](CHANGELOG.md)
 a keretedből és mikor újul meg.
 
 ### Amit a kijelzőn látsz
-- Profilonként: a **név**, a **session (5 órás)** és a **heti** keret **maradék százaléka**, mindkettőhöz **sáv**, és hogy
+- Profilonként: a **név**, a **session (5 órás)** és a **heti** keret **fogyása százalékban** (mint a claude.ai Usage oldalán), mindkettőhöz **sáv**, és hogy
   **mikor újul meg** (visszaszámláló másodpercre + dátum: `RST 02:03:46 @09.18 12:30`).
 - A **címke színe** a maradék szerint zöldből sárgán át pirosba vált.
 - Több profil esetén **magától váltogat** (1–60 s, állítható).
@@ -200,7 +200,7 @@ más: **saját, natív 320×240-es (fekvő) elrendezése** van ([`src/display_cy
 betűkkel:
 
 - **fejléc:** profilnév, jobbra az adat kora vagy a hiba (`ERR 429` + `7m OLD`);
-- **keretenként egy blokk:** a címke a maradék szerint színezve, jobbra nagy számmal a **maradék %**, alatta sáv (SESSION:
+- **keretenként egy blokk:** a címke a maradék szerint színezve, jobbra nagy számmal a **fogyás %** (used), alatta sáv (SESSION:
   a **fogyás**, zöldből pirosba menő színátmenettel; WEEKLY: a **maradék**, egy tónussal, ami fogyva zöldből pirosba vált), és a
   **visszaszámlálás nagy betűvel**, mellette kicsiben a reset dátuma (`RST 02:17:32  @09.20 00:02`);
 - **lábléc:** a setup-oldal címe (`http://<IP>`), több profilnál a sorszám (`1/3`).
@@ -464,10 +464,10 @@ Kijelző-elrendezés:
 
 ```
 xiTech                     12s      0   profilnév (+ jobb felül IP / állapot)
-SESSION             73% LEFT        16  cimke + maradék
+SESSION             27% USED        16  cimke + fogyás
 [██████████████░░░░░░░░░░░░░]       32  sáv
 RST 04:49:27 @09.17 21:00           40  reset
-WEEKLY              59% LEFT        48
+WEEKLY              41% USED        48
 [████████████████████░░░░░░░]       64  sáv (2026-09-18 óta a hetinek is van)
 RST 3d04:12:33 09.24 09:00          72
 ```

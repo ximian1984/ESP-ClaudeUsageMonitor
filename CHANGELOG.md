@@ -39,6 +39,9 @@ hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletez
   - Eddig mindkettő a maradékot mutatta, és 30 % maradékig tiszta zöld volt, ezért nem sárgult.
   - Közbülső próbálkozások (elvetve): mindkét csík egy tónussal; majd mindkettő helyzet szerinti átmenettel. A
     projektgazda a két keretet eltérően olvassa: a session a fogyás, a heti egy fogyó érték.
+- **A kijelzett szám a fogyás** („69 % used"), a maradék helyett, mindkét lapon (projektgazda): így egyezik a
+  claude.ai Usage oldalával. Előtte a projektgazda a „31 % left"-et fogyásnak olvasta; az adat jó volt (claude.ai:
+  session 7 % / heti 69 % used = kijelző 93 % / 31 % left). A szám színe továbbra is a maradékból jön.
 - Konfig: `displayFlip` (bool) → `displayRot` (negyedfordulat, NVS `drot`). A régi `flip` kulcs és a régi mentés
   `displayFlip` mezője 180°-ként töltődik be; a `flip` a 180°-hoz továbbra is íródik (visszaálláshoz). Az API
   (`/api/config`, `/api/display`, export/import) a `displayRot`-ot is adja/fogadja, a régi `flip`/`displayFlip`-et is.
