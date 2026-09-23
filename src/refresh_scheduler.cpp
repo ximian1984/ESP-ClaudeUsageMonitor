@@ -1,5 +1,7 @@
 #include "refresh_scheduler.h"
 
+#include <esp_task_wdt.h>
+
 #include <algorithm>
 
 #include "claude_client.h"
@@ -22,6 +24,9 @@ static const uint32_t TASK_STACK = 16384;
 static const uint32_t PARSER_PENDING_RETRY_MS = 300000UL;
 
 void RefreshScheduler::begin() {
+  // ⚠ MERES (2026-09-23): a klasszikus ESP32-n a TLS-kezfogas alatt az IDLE0 kiehezik -> task watchdog abort
+  // (bootloop). Amig a valodi ok nincs megmerve, a WDT turelmi ideje feljebb, hogy a naplo tulelje a kezfogast.
+  esp_task_wdt_init(CLAUDE_TASK_WDT_S, true);
   // Core 0: a Wi-Fi stack magja; a loop()/kijelzo/webszerver a core 1-en fut tovabb.
   xTaskCreatePinnedToCore(taskEntry, "claude_refresh", TASK_STACK, this, 1, nullptr, 0);
 }
@@ -175,7 +180,9 @@ void RefreshScheduler::run() {
   DeviceConfig &cfg = *cfgHeap;
       const ClaudeProfile &c = cfg.claude[pick];
       String access;
+      uint32_t tokT0 = millis();
       err = ensureOAuthToken(pick, c, access);  // OAuth: auto-refresh a lekeres elott
+      Serial.printf("[sched] token-lepes %u ms, hiba=%s\n", (unsigned)(millis() - tokT0), fetchErrorTitle(err));
       String orgId = c.orgId;
       // Gemini: a kvota-lekereshez project-ID kell; ha a login-kor nem sikerult, itt potoljuk (loadCodeAssist).
       if (err == FetchError::None && c.transport == (uint8_t)ClaudeTransport::Gemini && orgId.isEmpty()) {
@@ -189,7 +196,9 @@ void RefreshScheduler::run() {
         }
       }
       if (err == FetchError::None) {
+        uint32_t fetchT0 = millis();
         resp = fetchUsage((ClaudeTransport)c.transport, orgId.c_str(), access.c_str());
+        Serial.printf("[sched] usage-lekeres %u ms\n", (unsigned)(millis() - fetchT0));
         _fetchCount++;
         // Uj szolgaltato + 401/403: a RAM-beli token lejarhatott/visszavontak -> egyszeri refresh + ujra.
         if (resp.error == FetchError::Auth && providerUsesRamAccess((ClaudeTransport)c.transport) && c.refresh[0]) {

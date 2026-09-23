@@ -116,6 +116,9 @@ enum class ClaudeTransport : uint8_t {
 #define CLAUDE_REFRESH_DEFAULT_S  180
 #define REFRESH_PERIOD_MIN_S      60
 #define REFRESH_PERIOD_MAX_S      3600
+// ⚠ MERES (2026-09-23, CYD bootloop): az Arduino-alap 5 s-os task-WDT abortal, ha a TLS-kezfogas ennyit
+// szamol a 0-s magon. 30 s: a WDT tovabbra is elkapja a valodi beragadast, de a kezfogast nem oli meg.
+#define CLAUDE_TASK_WDT_S         30
 #define CLAUDE_BACKOFF_MAX_S      1800   // atmeneti hibanal legfeljebb 30 perc
 #define CLAUDE_AUTH_BACKOFF_S     600    // 401/403: a szerver x-should-retry: false-t kuld (mert, tervdoksi 2.2)
 #define CLAUDE_HTTP_TIMEOUT_MS    10000

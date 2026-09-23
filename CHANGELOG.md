@@ -8,6 +8,23 @@ hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletez
 
 ---
 
+## [Nem kiadott] – 2026-09-23
+
+### Javítva
+- ⛔ **Bootloop a CYD-n (task watchdog), mérve 2026-09-23.** A `claude_refresh` feladat a 0-as magon fut; az OAuth
+  token-frissítés TLS-kézfogása **5,5 s**-ig számol (mérve kétszer: 5492 ms, 5571 ms), közben az `IDLE0` nem jut
+  szóhoz, és az Arduino alapértelmezett **5 s**-os task-WDT `abort()`-ot hív: `Task watchdog got triggered … IDLE0
+  (CPU 0) … CPU 0: claude_refresh`, `rst:0xc (SW_CPU_RESET)`, és ez körbe-körbe. A WDT türelmi ideje ezért
+  **30 s** (`CLAUDE_TASK_WDT_S`, `esp_task_wdt_init`): a valódi beragadást továbbra is elkapja, a kézfogást nem öli
+  meg. A javítás után 90 s alatt nulla újraindulás `[vason mérve]`.
+- ⚠ Amiért **most** jött elő: a CYD refresh tokenje meghalt (`[oauth] token HTTP 400 (400 invalid_grant)`), ezért
+  minden indulás a lassú frissítési ágra fut, nem a gyorsítótárazott tokenre. Ez a két eszköz / egy Claude-belépés
+  ismert kockázata (a Claude minden frissítéskor cseréli a refresh tokent) — a kijelzőn `RE-LOGIN`, a megoldás a
+  setup-oldalon új belépés.
+- Napló: a token-lépés és a usage-lekérés ideje kiírva (`[sched] token-lepes … ms`, `[sched] usage-lekeres … ms`).
+
+---
+
 ## [Nem kiadott] – 2026-09-21
 
 ### Mérve
