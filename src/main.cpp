@@ -1,6 +1,8 @@
 // Claude Usage Monitor — LILYGO T-Dongle-S3 es ESP32-2432S028R (CYD); a lapkat a platformio.ini env-je valasztja (config.h)
 // Fo ciklus millis()-alapu, nem blokkol; a Claude-lekeres kulon FreeRTOS taskban fut (refresh_scheduler).
 #include <Arduino.h>
+#include <Preferences.h>
+#include <esp_system.h>
 
 #include "admin_auth.h"
 #include "config.h"
@@ -33,9 +35,45 @@ static bool bootWindow() {
   return false;
 }
 
+// ⛔ Panikhurok-or (mérve 2026-09-23). Egy panik/watchdog utan a lapka ujraindul, es INDULASKOR AZONNAL
+// lekerdez — ha a panikot epp a lekeres okozza, ez vegtelen bootloop. Az NVS-ben szamoljuk az egymast koveto
+// rendellenes ujrainditasokat: BOOT_PANIC_LIMIT utan az elso lekeres var, hogy a setup-oldal es a kijelzo
+// elerheto maradjon. BOOT_HEALTHY_MS zavartalan uzem utan a szamlalo nullazodik (bootGuardHealthy).
+static const char *BOOT_NS = "bootguard";
+
+static uint8_t bootGuardBegin() {
+  esp_reset_reason_t r = esp_reset_reason();
+  bool abnormal = r == ESP_RST_PANIC || r == ESP_RST_TASK_WDT || r == ESP_RST_INT_WDT || r == ESP_RST_WDT;
+  Preferences p;
+  p.begin(BOOT_NS, false);
+  uint8_t n = p.getUChar("panic", 0);
+  n = abnormal ? (n < 255 ? (uint8_t)(n + 1) : n) : 0;
+  p.putUChar("panic", n);
+  p.end();
+  Serial.printf("[boot] reset-ok %d%s, egymas utani panik-ujrainditas: %u\n", (int)r,
+                abnormal ? " (RENDELLENES)" : "", (unsigned)n);
+  return n;
+}
+
+// A szamlalot csak HOSSZU, zavartalan uzem nullazza — enelkul minden ujraindulas tiszta lappal indulna,
+// es a hurkot sosem ismernenk fel.
+static void bootGuardHealthy() {
+  static bool cleared = false;
+  if (cleared || millis() < BOOT_HEALTHY_MS) return;
+  cleared = true;
+  Preferences p;
+  p.begin(BOOT_NS, false);
+  if (p.getUChar("panic", 0)) {
+    p.putUChar("panic", 0);
+    Serial.println("[boot] zavartalan uzem -> panik-szamlalo nullazva");
+  }
+  p.end();
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.printf("\n[main] %s, firmware %s\n", BOARD_NAME, FW_VERSION);
+  uint8_t panics = bootGuardBegin();
   pinMode(PIN_BOOT_BTN, INPUT_PULLUP);
 
   configManager.begin();
@@ -50,7 +88,7 @@ void setup() {
 
   wifiManager.begin(forced);
   webSetup.begin();
-  refreshScheduler.begin();
+  refreshScheduler.begin(panics >= BOOT_PANIC_LIMIT ? BOOT_PANIC_HOLDOFF_MS : 0);
 }
 
 void loop() {
@@ -65,9 +103,13 @@ void loop() {
     btnDownMs = 0;
   }
 
+#ifdef BOOTGUARD_TEST  // csak a panikhurok-or MERESEHEZ: szandekos panik indulas utan (soha nem kerul kiadasba)
+  if (millis() > 8000) abort();
+#endif
   wifiManager.loop();
   timeManager.loop(wifiManager.staConnected());
   webSetup.loop();
   displayManager.loop();
+  bootGuardHealthy();
   delay(2);  // a tobbi tasknak (IDLE watchdog)
 }

@@ -372,7 +372,7 @@ after the dongle is plugged in is `⚠ [to be measured on hardware]`.
    ```sh
    pio device monitor -p /dev/cu.usbmodemXXXX -b 115200
    ```
-   Expected first line: `[main] LILYGO T-Dongle-S3, firmware 0.1.0` (`src/main.cpp`). If you do not see it, the line
+   Expected first line: `[main] LILYGO T-Dongle-S3, firmware 0.2.0` (`src/main.cpp`). If you do not see it, the line
    printed before the restart may have been lost (USB-CDC reconnects). Unplug and replug with the monitor running.
 8. Display: `Press BOOT now for setup mode` for 3 s, then the AP screen (§6).
 

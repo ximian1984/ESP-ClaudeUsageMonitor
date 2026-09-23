@@ -23,9 +23,10 @@ RefreshScheduler refreshScheduler;
 static const uint32_t TASK_STACK = 16384;
 static const uint32_t PARSER_PENDING_RETRY_MS = 300000UL;
 
-void RefreshScheduler::begin() {
-  // ⚠ MERES (2026-09-23): a klasszikus ESP32-n a TLS-kezfogas alatt az IDLE0 kiehezik -> task watchdog abort
-  // (bootloop). Amig a valodi ok nincs megmerve, a WDT turelmi ideje feljebb, hogy a naplo tulelje a kezfogast.
+void RefreshScheduler::begin(uint32_t holdOffMs) {
+  _holdOffMs = holdOffMs;
+  // ⛔ MERVE (2026-09-23): a klasszikus ESP32-n a TLS-kezfogas 5,5 s-ig szamol a 0-s magon, kozben az IDLE0
+  // kiehezik -> task watchdog abort -> bootloop. A kezfogas nem szeletelheto, ezert a WDT turelmi ideje feljebb.
   esp_task_wdt_init(CLAUDE_TASK_WDT_S, true);
   // Core 0: a Wi-Fi stack magja; a loop()/kijelzo/webszerver a core 1-en fut tovabb.
   xTaskCreatePinnedToCore(taskEntry, "claude_refresh", TASK_STACK, this, 1, nullptr, 0);
@@ -124,6 +125,7 @@ void RefreshScheduler::run() {
   uint32_t nextDue[MAX_CLAUDE_PROFILES] = {0};
   bool active[MAX_CLAUDE_PROFILES] = {false};
   uint32_t identity[MAX_CLAUDE_PROFILES] = {0};  // ha az org vagy az auth valtozik, a regi cache ervenytelen
+  bool anyActive = false;                        // volt-e mar aktiv profil (az elso kor felismeresehez)
   uint32_t periodMs = CLAUDE_REFRESH_DEFAULT_S * 1000UL;
 
   for (;;) {
@@ -141,6 +143,7 @@ void RefreshScheduler::run() {
       // Csak az UJ vagy MEGVALTOZOTT profil kap uj idopontot; mas konfigvaltozas (pl. rotacio,
       // token-rotacio) nem inditja ujra a lekereseket. Az uj profilok a period/N racsra kerulnek.
       int k = 0;
+      bool first = seenVersion != 0 && !anyActive;
       for (int i = 0; i < MAX_CLAUDE_PROFILES; i++) {
         const ClaudeProfile &c = cfg.claude[i];
         uint32_t id = profileIdentity(c);
@@ -150,12 +153,16 @@ void RefreshScheduler::run() {
           if (identity[i] != 0) tokenCache.clear(i);  // felhasznaloi szerkesztes: a regi RAM-token nem ervenyes
         }
         if (nowActive && (!active[i] || id != identity[i])) {
-          nextDue[i] = now + 2000 + (uint32_t)k * (periodMs / (uint32_t)n);
+          // Panikhurok utan az elso lekeres var (main.cpp bootGuard); a kesobbi profil-szerkesztes mar nem.
+          nextDue[i] = now + (first ? _holdOffMs : 0) + 2000 + (uint32_t)k * (periodMs / (uint32_t)n);
         }
         if (nowActive) k++;
         identity[i] = id;
         active[i] = nowActive;
+        anyActive = anyActive || nowActive;
       }
+      if (first && _holdOffMs)
+        Serial.printf("[sched] panikhurok-or: az elso lekeres %u s-ot var\n", (unsigned)(_holdOffMs / 1000));
     }
 
     if (!wifiManager.staConnected() || !timeManager.synced()) continue;

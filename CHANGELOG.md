@@ -1,7 +1,11 @@
 # Changelog
 
-A [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) formátumot követi. A firmware-verzió (`FW_VERSION`) még
-`0.1.0`: az alábbi dátumozott bejegyzések a fejlesztés menetét rögzítik, kiadás még nem volt.
+A [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) formátumot követi. **Két verziószám van, és nem ugyanazt
+jelentik:** a repó `VERSION` fájlját a pre-commit hook lépteti minden commitnál (nyomkövetéshez), a **firmware
+verziója** viszont a `FW_VERSION` (`src/config.h`) — ez látszik a soros naplóban és a setup-oldalon, és **csak akkor
+lép**, ha a vason futó viselkedés változik. `0.1.0` → **`0.2.0`** (2026-09-23, a bootloop-javítással).
+
+Az alábbi dátumozott bejegyzések a fejlesztés menetét rögzítik.
 
 **Olvasási kulcs:** `[vason mérve]` = a dongle-on futott és megnéztük; `[forrásból]` = hivatalos kód/doksi alapján,
 hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletezi.
@@ -22,6 +26,19 @@ hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletez
   ismert kockázata (a Claude minden frissítéskor cseréli a refresh tokent) — a kijelzőn `RE-LOGIN`, a megoldás a
   setup-oldalon új belépés.
 - Napló: a token-lépés és a usage-lekérés ideje kiírva (`[sched] token-lepes … ms`, `[sched] usage-lekeres … ms`).
+
+### Hozzáadva
+- ⭐ **Panikhurok-őr** (`main.cpp`, `bootGuardBegin`/`bootGuardHealthy`), hogy **bootloop többé ne fordulhasson elő**,
+  akkor sem, ha egy jövőbeli hiba megint panikol. Minden indulás megnézi a reset okát (`esp_reset_reason`); a
+  panik/watchdog-újraindulásokat NVS-ben számolja (`bootguard/panic`). `BOOT_PANIC_LIMIT` (3) egymást követő
+  rendellenes indulás után az **első lekérés `BOOT_PANIC_HOLDOFF_MS` (2 perc) várakozik** — a kijelző és a
+  setup-oldal közben elérhető, tehát a lap javítható marad. `BOOT_HEALTHY_MS` (60 s) zavartalan üzem után a
+  számláló nullázódik, így egyetlen elszigetelt panik nem lassítja a következő indulást.
+- ⭐ **Mérve, szándékos panikkal** `[vason mérve]` 2026-09-23: `PLATFORMIO_BUILD_FLAGS="-DBOOTGUARD_TEST=1"`
+  (8 s után `abort()`). A napló: `panik-ujrainditas: 1 … 2 … 3`, és a harmadiknál megjelent a
+  `[sched] panikhurok-or: az elso lekeres 120 s-ot var` sor. A `BOOTGUARD_TEST` ág csak ehhez a méréshez van,
+  alapból nincs lefordítva.
+- A firmware verziója a soros naplóban most `0.2.0`.
 
 ---
 

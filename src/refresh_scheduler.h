@@ -7,13 +7,15 @@
 
 class RefreshScheduler {
  public:
-  void begin();
+  // holdOffMs: indulas utani varakozas az ELSO lekeresig (panikhurok-or, main.cpp).
+  void begin(uint32_t holdOffMs = 0);
   uint32_t fetchCount() const { return _fetchCount; }  // diagnosztika (acceptance 19.)
 
  private:
   static void taskEntry(void *arg);
   void run();
   volatile uint32_t _fetchCount = 0;
+  uint32_t _holdOffMs = 0;
 };
 
 extern RefreshScheduler refreshScheduler;
