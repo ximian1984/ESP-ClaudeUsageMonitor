@@ -32,6 +32,11 @@ void RefreshScheduler::begin(uint32_t holdOffMs) {
   xTaskCreatePinnedToCore(taskEntry, "claude_refresh", TASK_STACK, this, 1, nullptr, 0);
 }
 
+void RefreshScheduler::requestNow(int idx) {
+  if (idx < 0 || idx >= MAX_CLAUDE_PROFILES) return;
+  _kick |= (1UL << idx);
+}
+
 void RefreshScheduler::taskEntry(void *arg) { static_cast<RefreshScheduler *>(arg)->run(); }
 
 static uint32_t backoffMs(FetchError e, uint16_t failures, uint32_t periodMs) {
@@ -131,6 +136,16 @@ void RefreshScheduler::run() {
   for (;;) {
     vTaskDelay(pdMS_TO_TICKS(250));
     uint32_t now = millis();
+
+    // Azonnali lekeres-keres (requestNow): a hibabol jovo varakozast eldobjuk erre az egy profilra.
+    if (uint32_t kick = _kick) {
+      _kick &= ~kick;
+      for (int i = 0; i < MAX_CLAUDE_PROFILES; i++)
+        if (kick & (1UL << i)) {
+          nextDue[i] = now;
+          Serial.printf("[sched] azonnali lekeres kerve: profil %d\n", i);
+        }
+    }
 
     if (configManager.version() != seenVersion) {
       seenVersion = configManager.version();

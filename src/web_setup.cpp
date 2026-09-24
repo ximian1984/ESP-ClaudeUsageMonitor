@@ -366,6 +366,9 @@ static bool storeLoginTokens(const ProviderTokens &t, String &err) {
     tokenCache.set(idx, t.access, timeManager.now() + (time_t)(t.expiresIn ? t.expiresIn : PROVIDER_ACCESS_DEFAULT_TTL_S));
   }
   usageCache.forgetLastKnown(idx);  // uj bejelentkezes: lehet masik fiok
+  // ⛔ MERVE (2026-09-24): enelkul a RE-LOGIN utani 10 perces backoff az uj token utan is kivarodik, es az eszkoz
+  // ugy nez ki, mintha nem probalna csatlakozni. A sikeres belepes azonnali lekerest inditson.
+  refreshScheduler.requestNow(idx);
   return true;
 }
 

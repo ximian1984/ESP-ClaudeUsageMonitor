@@ -1,7 +1,7 @@
 // Forditasi ideju allandok. Titok NEM lehet itt (spec 6., 19.).
 #pragma once
 
-#define FW_VERSION "0.2.0"
+#define FW_VERSION "0.2.1"
 
 // --- Lapka-valasztas: a platformio.ini env-je adja (-DBOARD_CYD). A kijelzo SPI-pinjei ott vannak (TFT_eSPI). ---
 #if defined(BOARD_CYD)

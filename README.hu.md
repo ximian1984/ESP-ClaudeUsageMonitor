@@ -369,7 +369,7 @@ csatlakoztatása után történik, az `⚠ [vason mérendő]`.
    ```sh
    pio device monitor -p /dev/cu.usbmodemXXXX -b 115200
    ```
-   Elvárt első sor: `[main] LILYGO T-Dongle-S3, firmware 0.2.0` (`src/main.cpp`). Ha nem látszik, az újraindulás
+   Elvárt első sor: `[main] LILYGO T-Dongle-S3, firmware 0.2.1` (`src/main.cpp`). Ha nem látszik, az újraindulás
    előtt kiírt sor elveszhetett (USB-CDC újracsatlakozik). Ilyenkor húzd ki és dugd vissza, a monitor fusson közben.
 8. Kijelző: 3 s-ig `Press BOOT now for setup mode`, utána AP-képernyő (6. szakasz).
 

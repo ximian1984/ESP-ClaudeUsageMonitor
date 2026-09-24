@@ -3,7 +3,7 @@
 A [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) formátumot követi. **Két verziószám van, és nem ugyanazt
 jelentik:** a repó `VERSION` fájlját a pre-commit hook lépteti minden commitnál (nyomkövetéshez), a **firmware
 verziója** viszont a `FW_VERSION` (`src/config.h`) — ez látszik a soros naplóban és a setup-oldalon, és **csak akkor
-lép**, ha a vason futó viselkedés változik. `0.1.0` → **`0.2.0`** (2026-09-23, a bootloop-javítással).
+lép**, ha a vason futó viselkedés változik. `0.1.0` → `0.2.0` (2026-09-23, a bootloop-javítás) → **`0.2.1`** (2026-09-24).
 
 Az alábbi dátumozott bejegyzések a fejlesztés menetét rögzítik.
 
@@ -12,7 +12,25 @@ hardveren még nem igazolt. A méréseket a belső tervdokumentáció részletez
 
 ---
 
-## [Nem kiadott] – 2026-09-23
+## [0.2.1] – 2026-09-24
+
+### Javítva
+- ⛔ **Az újrahitelesítés után az eszköz nem próbált csatlakozni** (projektgazda, mérve 2026-09-24). Lejárt tokennél a
+  lekérés `RE-LOGIN`-nal bukik, és az ütemező ilyenkor `CLAUDE_AUTH_BACKOFF_S` = **10 perc** várakozást állít be. A
+  sikeres újrabelépés viszont csak a tokeneket írta felül: a profil azonossága (`profileIdentity`) szándékosan nem
+  tartalmazza a tokent, ezért az ütemező **nem ütemezett újra**, és a friss token ellenére kivárta a 10 percet.
+  Kívülről ez úgy látszott, mintha a belépés nem is történt volna meg. Mostantól a sikeres be-/újrabejelentkezés
+  **azonnali lekérést kér** (`RefreshScheduler::requestNow`, hívja a `storeLoginTokens`), és a napló is jelzi:
+  `[sched] azonnali lekeres kerve: profil N`.
+- ⭐ Ehhez **nem kell törölni a profilt**: elég az *Authenticate* gomb.
+
+### Mérve
+- A token-lépés ideje lapkánként: **dongle (ESP32-S3) 2,8 s**, **CYD (klasszikus ESP32) 5,5 s** — ezért ütközött a
+  bootloopba csak a CYD az 5 s-os alapértelmezett watchdoggal.
+
+---
+
+## [0.2.0] – 2026-09-23
 
 ### Javítva
 - ⛔ **Bootloop a CYD-n (task watchdog), mérve 2026-09-23.** A `claude_refresh` feladat a 0-as magon fut; az OAuth
